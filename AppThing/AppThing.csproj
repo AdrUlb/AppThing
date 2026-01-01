@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\External\GLCS\GLCS.Managed\GLCS.Managed.csproj"/>
+        <ProjectReference Include="..\External\SDL3CS\SDL3CS\SDL3CS.csproj" />
+    </ItemGroup>
+
+</Project>

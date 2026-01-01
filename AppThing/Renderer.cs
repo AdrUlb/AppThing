@@ -1,0 +1,144 @@
+using GLCS;
+using GLCS.Managed;
+using SDL3CS;
+using System.Drawing;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+
+namespace AppThing;
+
+public sealed class Renderer : IDisposable
+{
+	private readonly Window _window;
+	internal static readonly ManagedGL Gl = new(static proc => Sdl.GL_GetProcAddress(proc));
+
+	private readonly Sdl.GLContext _glContext;
+	private readonly MultisampleFramebuffer _msaaBuffer;
+	private readonly QuadRenderer _quadBatch;
+	private readonly int _msaaSamples;
+	private bool _disposed;
+	private Size _size;
+	private volatile bool _sizeChanged = false;
+	
+	public Color ClearColor { get; set; } = Color.Black;
+	
+	internal Renderer(Window window)
+	{
+		_window = window;
+
+		// Create GL context
+		Console.Write("[Renderer] Creating GL context... ");
+		_glContext = Sdl.GL_CreateContext(window.SdlWindowPtr.Value);
+		if (_glContext.IsNull)
+		{
+			throw new($"Failed to create GL context: {Sdl.GetError()}");
+		}
+
+		Console.WriteLine($"done");
+
+		MakeCurrent();
+
+		_msaaBuffer = new(supportDepthBuffer: false);
+		_quadBatch = new();
+
+		Console.WriteLine($"[Renderer] OpenGL Renderer: {Gl.GetString(StringName.Renderer)}");
+		Console.WriteLine($"[Renderer] OpenGL Version: {Gl.GetString(StringName.Version)}");
+
+		Sdl.GL_SetSwapInterval(0);
+
+		Gl.Enable(EnableCap.Multisample);
+		Gl.Enable(EnableCap.CullFace);
+		Gl.Enable(EnableCap.Blend);
+
+		Gl.Unmanaged.FrontFace(FrontFaceDirection.Cw);
+		Gl.Unmanaged.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+		_msaaSamples = Math.Min(16, Gl.GetInteger(GetPName.MaxFramebufferSamples));
+		DoneCurrent();
+	}
+
+	public void Dispose()
+	{
+		MakeCurrent();
+
+		if (_disposed)
+			return;
+
+		_msaaBuffer.Dispose();
+		_quadBatch.Dispose();
+		_disposed = true;
+
+		DoneCurrent();
+
+		Sdl.GL_DestroyContext(_glContext);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void SwapBuffers() => Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void MakeCurrent()
+	{
+		Sdl.GL_MakeCurrent(_window.SdlWindowPtr.Value, _glContext);
+		Gl.MakeCurrent();
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void DoneCurrent()
+	{
+		ManagedGL.DoneCurrent();
+		Sdl.GL_MakeCurrent(_window.SdlWindowPtr.Value, Sdl.GLContext.Null);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void SetSize(Size size)
+	{
+		_size = size;
+		_sizeChanged = true;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void BeginFrame()
+	{
+		if (_sizeChanged)
+		{
+			Gl.Viewport(0, 0, _size.Width, _size.Height);
+			_msaaBuffer.Setup(_size, _msaaSamples);
+			_quadBatch.HandleSizeChanged(_size);
+			_sizeChanged = false;
+		}
+
+		_msaaBuffer.BeginFrame();
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void Clear()
+	{
+		Gl.Clear(ClearColor, ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void EndFrame()
+	{
+		_quadBatch.Commit();
+		_msaaBuffer.EndFrame();
+		_msaaBuffer.Blit();
+		
+		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect, Color color, in Matrix4x4 transformation) => _quadBatch.Draw(texture, destRect, sourceRect, transformation, color);
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect, Color color) => Draw(texture, destRect, sourceRect, color, Matrix4x4.Identity);
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect) => Draw(texture, destRect, sourceRect, Color.White);
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Draw(Texture texture, RectangleF destRect) => Draw(texture, destRect, new(Point.Empty, texture.Size));
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Draw(Texture texture, PointF location) => Draw(texture, new RectangleF(location, texture.Size));
+}

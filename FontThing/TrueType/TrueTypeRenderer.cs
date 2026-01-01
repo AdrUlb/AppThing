@@ -1,0 +1,299 @@
+using System.Buffers;
+using System.Diagnostics;
+using System.Numerics;
+using System.Runtime.InteropServices;
+using FontThing.TrueType.Parsing;
+using System.Drawing;
+
+namespace FontThing.TrueType;
+
+public static class TrueTypeRenderer
+{
+	private static readonly byte[] _gammaTable = GenerateGammaTable(1.6f);
+
+	private static byte[] GenerateGammaTable(float gamma)
+	{
+		var table = new byte[256];
+		for (var i = 0; i < table.Length; i++)
+		{
+			// Convert to 0-1
+			var linear = i / 255.0f;
+
+			// Gamma correction
+			var corrected = MathF.Pow(linear, 1.0f / gamma);
+
+			// Convert back to 0-255
+			table[i] = (byte)Math.Clamp(corrected * 255, 0, 255);
+		}
+
+		return table;
+	}
+
+	public readonly struct RenderedGlyph(byte[] alpha, Size alphaSize, RectangleF scaledBounds)
+	{
+		public readonly byte[] Alpha = alpha;
+		public readonly Size AlphaSize = alphaSize;
+		public readonly RectangleF ScaledBounds = scaledBounds;
+	}
+
+	public static float CalculateStemDarkeningAmount(float pixelsPerEm)
+	{
+		switch (pixelsPerEm)
+		{
+			case <= 10.0f:
+				return 0.25f;
+			case >= 36.0f:
+				return 0.0f;
+			default:
+				{
+					var t = (pixelsPerEm - 10.0f) / (36.0f - 10.0f);
+					return float.Lerp(0.25f, 0.0f, t);
+				}
+		}
+	}
+
+	public static RenderedGlyph Render(GlyphOutline glyphOutline, float scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount)
+	{
+		var contours = GenerateContours(glyphOutline, scale * supersamples, bezierTolerance * supersamples);
+
+		var scaledBounds = glyphOutline.GetScaledBounds(scale);
+		var textureWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 2;
+		var textureHeight = (int)(scaledBounds.Height + subpixelOffsetY) + 2;
+
+		var alphaWidth = textureWidth * supersamples;
+		var alphaHeight = textureHeight * supersamples;
+
+		var boolPool = ArrayPool<bool>.Shared;
+		var supersampled = boolPool.Rent(alphaWidth * alphaHeight);
+
+		Render(contours, scaledBounds.X * supersamples, scaledBounds.Y * supersamples, supersampled, alphaWidth, alphaHeight, (subpixelOffsetX + 1) * supersamples, (subpixelOffsetY + 1) * supersamples, stemDarkeningAmount);
+
+		var alpha = new byte[textureWidth * textureHeight];
+		var downsampledPixelContrib = 1.0f / (supersamples * supersamples);
+
+		for (var y = 0; y < textureHeight; y++)
+		{
+			for (var x = 0; x < textureWidth; x++)
+			{
+				var a = 0.0f;
+
+				for (var offY = 0; offY < supersamples; offY++)
+				{
+					var yy = y * supersamples + offY;
+					var rowOffset = yy * alphaWidth;
+					var prevRowOffset = (yy > 0) ? (yy - 1) * alphaWidth : rowOffset;
+					var nextRowOffset = (yy < alphaHeight - 1) ? (yy + 1) * alphaWidth : rowOffset;
+
+					for (var offX = 0; offX < supersamples; offX++)
+					{
+						var xx = x * supersamples + offX;
+
+						var lit = supersampled[xx + rowOffset];
+						var prevLit = supersamples >= 4 && supersampled[xx + prevRowOffset];
+						var nextLit = supersamples >= 4 && supersampled[xx + nextRowOffset];
+
+						if (lit || prevLit || nextLit)
+							a += downsampledPixelContrib;
+					}
+				}
+
+				alpha[x + y * textureWidth] = _gammaTable[(byte)(a * 255)];
+			}
+		}
+
+		boolPool.Return(supersampled);
+
+		return new(alpha, new(textureWidth, textureHeight), scaledBounds);
+	}
+
+	private static void Render(List<Vector2>[] contours, float glyphXMin, float glyphYMin, Span<bool> pixels, int width, int height, float subpixelOffsetX, float subpixelOffsetY, float stemDarkening)
+	{
+		Debug.Assert(pixels.Length >= width * height);
+
+		var renderOffset = new Vector2(-glyphXMin, -glyphYMin);
+
+		Span<bool> contoursClockwise = stackalloc bool[contours.Length];
+		for (var i = 0; i < contours.Length; i++)
+			contoursClockwise[i] = IsContourClockwise(contours[i]);
+
+		var changes = new List<(float X, bool Clockwise, bool GoingDown)>();
+
+		for (var y = 0; y < height; y++)
+		{
+			changes.Clear();
+
+			var sampleY = y - subpixelOffsetY;
+
+			for (var contourIndex = 0; contourIndex < contours.Length; contourIndex++)
+			{
+				var contour = contours[contourIndex];
+				var clockwise = contoursClockwise[contourIndex];
+				for (var pointIndex = 0; pointIndex < contour.Count; pointIndex++)
+				{
+					var p1 = contour[pointIndex] + renderOffset;
+					var p2 = contour[(pointIndex + 1) % contour.Count] + renderOffset;
+
+					// Both points entirely above or below this scanline
+					if ((p1.Y < sampleY && p2.Y < sampleY) || p1.Y >= sampleY && p2.Y >= sampleY)
+						continue;
+
+					var goingDown = p2.Y < p1.Y;
+
+					var lowerY = float.Min(p1.Y, p2.Y);
+					var boxHeight = float.Abs(p1.Y - p2.Y);
+					if (boxHeight == 0.0f)
+						continue;
+
+					var amount = (sampleY - lowerY) / boxHeight;
+
+					var changeX = !goingDown ? float.Lerp(p1.X, p2.X, amount) : float.Lerp(p2.X, p1.X, amount);
+
+					if (!goingDown)
+						changeX -= stemDarkening;
+					else
+						changeX += stemDarkening;
+
+					changes.Add((changeX, clockwise, goingDown));
+				}
+			}
+
+			changes.Sort((a, b) => a.X.CompareTo(b.X));
+
+			var fillCount = 0;
+			var noFillCount = 0;
+			var nextChangeI = 0;
+
+			var fill = false;
+
+			for (var x = 0; x < width; x++)
+			{
+				var sampleX = x - subpixelOffsetX;
+
+				while (nextChangeI < changes.Count && sampleX >= changes[nextChangeI].X)
+				{
+					var change = changes[nextChangeI];
+
+					if (change.Clockwise)
+					{
+						if (change.GoingDown)
+							fillCount--;
+						else
+							fillCount++;
+					}
+					else
+					{
+						if (!change.GoingDown)
+							noFillCount--;
+						else
+							noFillCount++;
+					}
+
+					nextChangeI++;
+
+					fill = noFillCount == 0 && fillCount > 0;
+				}
+
+				var i = x + y * width;
+				pixels[i] = fill;
+			}
+		}
+	}
+
+	private static bool IsContourClockwise(List<Vector2> points)
+	{
+		var sum = 0.0f;
+
+		for (var i = 0; i < points.Count; i++)
+		{
+			var p1 = points[i];
+			var p2 = points[(i + 1) % points.Count];
+			sum += (p2.X - p1.X) * (p2.Y + p1.Y);
+		}
+
+		return sum > 0.0f;
+	}
+
+	private static List<Vector2>[] GenerateContours(GlyphOutline glyphOutline, float scale, float bezierTolerance)
+	{
+		if (glyphOutline is not SimpleGlyphOutline simpleGlyphOutline)
+			throw new NotImplementedException();
+
+		var contours = new List<Vector2>[simpleGlyphOutline.EndPointsOfContours.Length];
+
+		// Iterate over all contours
+		var contourStartpointIndex = 0;
+		for (var contourIndex = 0; contourIndex < simpleGlyphOutline.EndPointsOfContours.Length; contourIndex++)
+		{
+			var contourEndpointIndex = simpleGlyphOutline.EndPointsOfContours[contourIndex];
+
+			contours[contourIndex] = GenerateContour(simpleGlyphOutline.Points.AsSpan()[contourStartpointIndex..(contourEndpointIndex + 1)], scale, bezierTolerance);
+
+			// Next contour's start point index immediately follows this contour's endpoint index
+			contourStartpointIndex = contourEndpointIndex + 1;
+		}
+
+		return contours;
+	}
+
+	private static List<Vector2> GenerateContour(ReadOnlySpan<GlyphPoint> points, float scale, float bezierTolerance)
+	{
+		var lines = new List<Vector2>();
+
+		// Find first on-curve point
+		var pointOffset = 0; // Index of first point to actually read in the loop
+		while (!points[pointOffset].OnCurve)
+			pointOffset++;
+
+		var p0Vec = GetScaledGlyphPoint(points[pointOffset++]);
+
+		var i = 0;
+		while (i < points.Length)
+		{
+			var index = (i + pointOffset) % points.Length;
+
+			var p1 = points[index];
+			var p1Vec = GetScaledGlyphPoint(p1);
+
+			// "Consume" P1
+			i++;
+
+			// Two consecutive on-curve points - straight line
+			if (p1.OnCurve)
+			{
+				lines.Add(p1Vec);
+				p0Vec = p1Vec;
+				continue;
+			}
+
+			index = (i + pointOffset) % points.Length;
+
+			var p2 = points[index];
+			var p2Vec = GetScaledGlyphPoint(p2);
+
+			if (p2.OnCurve) // Points are: on-curve, off-curve, on-curve - quadratic Bézier
+			{
+				i++;
+
+				AddBezier(p0Vec, p1Vec, p2Vec);
+				p0Vec = p2Vec;
+			}
+			else // Points are: on-curve, off-curve, off-curve - insert midpoint as on-curve point for quadratic Bézier
+			{
+				var midpoint = Vector2.Lerp(p1Vec, p2Vec, 0.5f);
+				AddBezier(p0Vec, p1Vec, midpoint);
+				p0Vec = midpoint;
+			}
+		}
+
+		// Next contour's start point index immediately follows this contour's endpoint index
+		return lines;
+
+		Vector2 GetScaledGlyphPoint(GlyphPoint point) => new Vector2(point.X, point.Y) * scale;
+
+		void AddBezier(Vector2 p0, Vector2 p1, Vector2 p2)
+		{
+			var result = BezierSubdivider.RecursiveBezier(p0, p1, p2, bezierTolerance);
+			lines.AddRange(CollectionsMarshal.AsSpan(result)[1..]);
+		}
+	}
+}

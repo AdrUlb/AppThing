@@ -1,0 +1,6 @@
+[submodule "External/GLCS"]
+	path = External/GLCS
+	url = https://github.com/AdrUlb/GLCS.git
+[submodule "External/SDL3CS"]
+	path = External/SDL3CS
+	url = https://github.com/AdrUlb/SDL3CS
