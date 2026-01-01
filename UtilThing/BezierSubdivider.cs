@@ -1,6 +1,7 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
-namespace FontThing;
+namespace UtilThing;
 
 public static class BezierSubdivider
 {
@@ -13,7 +14,7 @@ public static class BezierSubdivider
 		return output;
 	}
 
-	private static void RecursiveBezier(Vector2 p0, Vector2 p1, Vector2 p2, List<Vector2> output, float tolerance)
+	public static void RecursiveBezier(Vector2 p0, Vector2 p1, Vector2 p2, IList<Vector2> output, float tolerance)
 	{
 		if (IsStraightEnough(p0, p1, p2, tolerance))
 		{
@@ -30,7 +31,7 @@ public static class BezierSubdivider
 		RecursiveBezier(rightP0, rightP1, rightP2, output, tolerance);
 	}
 
-	private static void Subdivide(Vector2 p0, Vector2 p1, Vector2 p2, Span<Vector2> left, Span<Vector2> right)
+	public static void Subdivide(Vector2 p0, Vector2 p1, Vector2 p2, Span<Vector2> left, Span<Vector2> right)
 	{
 		// Compute midpoints between control points
 		var p01 = Vector2.Lerp(p0, p1, 0.5f);
@@ -47,7 +48,7 @@ public static class BezierSubdivider
 		right[2] = p2;
 	}
 
-	private static void Subdivide(Vector2 p0, Vector2 p1, Vector2 p2, out Vector2 leftP0, out Vector2 leftP1, out Vector2 leftP2, out Vector2 rightP0, out Vector2 rightP1, out Vector2 rightP2)
+	public static void Subdivide(Vector2 p0, Vector2 p1, Vector2 p2, out Vector2 leftP0, out Vector2 leftP1, out Vector2 leftP2, out Vector2 rightP0, out Vector2 rightP1, out Vector2 rightP2)
 	{
 		// Compute midpoints between control points
 		var p01 = Vector2.Lerp(p0, p1, 0.5f);
@@ -64,6 +65,7 @@ public static class BezierSubdivider
 		rightP2 = p2;
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static bool IsStraightEnough(Vector2 p0, Vector2 p1, Vector2 p2, float tolerance)
 	{
 		// Distance of control point p1 to line p1->p3

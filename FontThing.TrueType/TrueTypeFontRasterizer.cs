@@ -4,76 +4,52 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using FontThing.TrueType.Parsing;
 using System.Drawing;
+using System.Text;
+using UtilThing;
 
 namespace FontThing.TrueType;
 
-public static class TrueTypeRenderer
+internal static class TrueTypeFontRasterizer
 {
-	private static readonly byte[] _gammaTable = GenerateGammaTable(1.6f);
-
-	private static byte[] GenerateGammaTable(float gamma)
+	public static float CalculateStemDarkening(float pixelsPerEm)
 	{
-		var table = new byte[256];
-		for (var i = 0; i < table.Length; i++)
-		{
-			// Convert to 0-1
-			var linear = i / 255.0f;
+		const float minPpem = 10.0f;
+		const float maxPpem = 36.0f;
+		const float maxDarkening = 0.25f;
 
-			// Gamma correction
-			var corrected = MathF.Pow(linear, 1.0f / gamma);
+		if (pixelsPerEm <= minPpem)
+			return maxDarkening;
 
-			// Convert back to 0-255
-			table[i] = (byte)Math.Clamp(corrected * 255, 0, 255);
-		}
+		if (pixelsPerEm >= maxPpem)
+			return 0.0f;
 
-		return table;
+		var t = (pixelsPerEm - minPpem) / (maxPpem - minPpem);
+		return float.Lerp(maxDarkening, 0.0f, t);
 	}
 
-	public readonly struct RenderedGlyph(byte[] alpha, Size alphaSize, RectangleF scaledBounds)
+	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, float scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma)
 	{
-		public readonly byte[] Alpha = alpha;
-		public readonly Size AlphaSize = alphaSize;
-		public readonly RectangleF ScaledBounds = scaledBounds;
-	}
-
-	public static float CalculateStemDarkeningAmount(float pixelsPerEm)
-	{
-		switch (pixelsPerEm)
-		{
-			case <= 10.0f:
-				return 0.25f;
-			case >= 36.0f:
-				return 0.0f;
-			default:
-				{
-					var t = (pixelsPerEm - 10.0f) / (36.0f - 10.0f);
-					return float.Lerp(0.25f, 0.0f, t);
-				}
-		}
-	}
-
-	public static RenderedGlyph Render(GlyphOutline glyphOutline, float scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount)
-	{
+		var gammaTable = GenerateGammaTable(gamma);
 		var contours = GenerateContours(glyphOutline, scale * supersamples, bezierTolerance * supersamples);
 
-		var scaledBounds = glyphOutline.GetScaledBounds(scale);
-		var textureWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 2;
-		var textureHeight = (int)(scaledBounds.Height + subpixelOffsetY) + 2;
+		var scaledBounds = glyphOutline.GetBounds(scale);
+		var bitmapWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 2;
+		var bitmapHeight = (int)(scaledBounds.Height + subpixelOffsetY) + 2;
 
-		var alphaWidth = textureWidth * supersamples;
-		var alphaHeight = textureHeight * supersamples;
+		var alphaWidth = bitmapWidth * supersamples;
+		var alphaHeight = bitmapHeight * supersamples;
 
 		var boolPool = ArrayPool<bool>.Shared;
 		var supersampled = boolPool.Rent(alphaWidth * alphaHeight);
 
-		Render(contours, scaledBounds.X * supersamples, scaledBounds.Y * supersamples, supersampled, alphaWidth, alphaHeight, (subpixelOffsetX + 1) * supersamples, (subpixelOffsetY + 1) * supersamples, stemDarkeningAmount);
+		RenderGlyph(contours, scaledBounds.X * supersamples, scaledBounds.Y * supersamples, supersampled, alphaWidth, alphaHeight, (subpixelOffsetX + 1) * supersamples, (subpixelOffsetY + 1) * supersamples, stemDarkeningAmount);
 
-		var alpha = new byte[textureWidth * textureHeight];
+		var bitmap = new byte[bitmapWidth * bitmapHeight];
 		var downsampledPixelContrib = 1.0f / (supersamples * supersamples);
 
-		for (var y = 0; y < textureHeight; y++)
+		for (var y = 0; y < bitmapHeight; y++)
 		{
-			for (var x = 0; x < textureWidth; x++)
+			for (var x = 0; x < bitmapWidth; x++)
 			{
 				var a = 0.0f;
 
@@ -97,23 +73,42 @@ public static class TrueTypeRenderer
 					}
 				}
 
-				alpha[x + y * textureWidth] = _gammaTable[(byte)(a * 255)];
+				var alpha = (byte)(a * 255);
+				bitmap[x + y * bitmapWidth] = gammaTable[alpha];
 			}
 		}
 
 		boolPool.Return(supersampled);
 
-		return new(alpha, new(textureWidth, textureHeight), scaledBounds);
+		return new(bitmap, new(bitmapWidth, bitmapHeight));
 	}
 
-	private static void Render(List<Vector2>[] contours, float glyphXMin, float glyphYMin, Span<bool> pixels, int width, int height, float subpixelOffsetX, float subpixelOffsetY, float stemDarkening)
+	private static byte[] GenerateGammaTable(float gamma)
+	{
+		var table = new byte[256];
+		for (var i = 0; i < table.Length; i++)
+		{
+			// Convert to 0-1
+			var linear = i / 255.0f;
+
+			// Gamma correction
+			var corrected = MathF.Pow(linear, 1.0f / gamma);
+
+			// Convert back to 0-255
+			table[i] = (byte)Math.Clamp(corrected * 255, 0, 255);
+		}
+
+		return table;
+	}
+
+	private static void RenderGlyph(IReadOnlyList<List<Vector2>> contours, float glyphXMin, float glyphYMin, Span<bool> pixels, int width, int height, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount)
 	{
 		Debug.Assert(pixels.Length >= width * height);
 
 		var renderOffset = new Vector2(-glyphXMin, -glyphYMin);
 
-		Span<bool> contoursClockwise = stackalloc bool[contours.Length];
-		for (var i = 0; i < contours.Length; i++)
+		Span<bool> contoursClockwise = stackalloc bool[contours.Count];
+		for (var i = 0; i < contours.Count; i++)
 			contoursClockwise[i] = IsContourClockwise(contours[i]);
 
 		var changes = new List<(float X, bool Clockwise, bool GoingDown)>();
@@ -124,7 +119,7 @@ public static class TrueTypeRenderer
 
 			var sampleY = y - subpixelOffsetY;
 
-			for (var contourIndex = 0; contourIndex < contours.Length; contourIndex++)
+			for (var contourIndex = 0; contourIndex < contours.Count; contourIndex++)
 			{
 				var contour = contours[contourIndex];
 				var clockwise = contoursClockwise[contourIndex];
@@ -149,9 +144,9 @@ public static class TrueTypeRenderer
 					var changeX = !goingDown ? float.Lerp(p1.X, p2.X, amount) : float.Lerp(p2.X, p1.X, amount);
 
 					if (!goingDown)
-						changeX -= stemDarkening;
+						changeX -= stemDarkeningAmount;
 					else
-						changeX += stemDarkening;
+						changeX += stemDarkeningAmount;
 
 					changes.Add((changeX, clockwise, goingDown));
 				}
@@ -213,11 +208,21 @@ public static class TrueTypeRenderer
 		return sum > 0.0f;
 	}
 
-	private static List<Vector2>[] GenerateContours(GlyphOutline glyphOutline, float scale, float bezierTolerance)
+	private static IReadOnlyList<List<Vector2>> GenerateContours(GlyphOutline glyphOutline, float scale, float bezierTolerance)
 	{
-		if (glyphOutline is not SimpleGlyphOutline simpleGlyphOutline)
-			throw new NotImplementedException();
+		switch (glyphOutline)
+		{
+			case SimpleGlyphOutline simpleGlyphOutline:
+				return GenerateContours(simpleGlyphOutline, scale, bezierTolerance);
+			case CompoundGlyphOutline compoundGlyphOutline:
+				return GenerateContours(compoundGlyphOutline, scale, bezierTolerance);
+			default:
+				throw new NotSupportedException("Only simple and compound glyph outlines are supported.");
+		}
+	}
 
+	private static List<Vector2>[] GenerateContours(SimpleGlyphOutline simpleGlyphOutline, float scale, float bezierTolerance)
+	{
 		var contours = new List<Vector2>[simpleGlyphOutline.EndPointsOfContours.Length];
 
 		// Iterate over all contours
@@ -230,6 +235,43 @@ public static class TrueTypeRenderer
 
 			// Next contour's start point index immediately follows this contour's endpoint index
 			contourStartpointIndex = contourEndpointIndex + 1;
+		}
+
+		return contours;
+	}
+
+	private static List<List<Vector2>> GenerateContours(CompoundGlyphOutline compoundGlyphOutline, float scale, float bezierTolerance)
+	{
+		var contours = new List<List<Vector2>>();
+
+		foreach (var component in compoundGlyphOutline.Components)
+		{
+			if (!component.ArgsAreXyValues)
+				throw new NotImplementedException();
+
+			var componentOutline = compoundGlyphOutline.Font.GetGlyphOutlineFromIndex(component.GlyphIndex);
+			Debug.Assert(componentOutline != null);
+
+			var componentContours = GenerateContours(componentOutline, scale, bezierTolerance);
+			foreach (var contour in componentContours)
+			{
+				for (var i = 0; i < contour.Count; i++)
+				{
+					ref var p = ref CollectionsMarshal.AsSpan(contour)[i];
+
+					// Apply scaling
+					var scaledX = p.X * (float)component.ScaleX + p.Y * (float)component.Scale01;
+					var scaledY = p.X * (float)component.Scale10 + p.Y * (float)component.ScaleY;
+
+					// Apply translation
+					scaledX += component.Arg1;
+					scaledY += component.Arg2;
+
+					p = new(scaledX, scaledY);
+				}
+
+				contours.Add(contour);
+			}
 		}
 
 		return contours;

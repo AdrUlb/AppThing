@@ -41,7 +41,7 @@ internal sealed class GlyfTable
 	public readonly FrozenDictionary<uint, GlyphOutline> OutlinesByIndex;
 	public readonly FrozenDictionary<uint, GlyphOutline> OutlinesByLocation;
 
-	public GlyfTable(StreamPrimitiveReader reader, LocaTable locaTable)
+	public GlyfTable(StreamPrimitiveReader reader, TrueTypeFont font, LocaTable locaTable)
 	{
 		var outlinesByIndex = new Dictionary<uint, GlyphOutline>();
 		var outlinesByLocation = new Dictionary<uint, GlyphOutline>();
@@ -168,7 +168,7 @@ internal sealed class GlyfTable
 					points[i].Y += prev;
 				}
 
-				glyph = new SimpleGlyphOutline(xMin, yMin, xMax, yMax, endPointsOfContours, instructions, points);
+				glyph = new SimpleGlyphOutline(font, xMin, yMin, xMax, yMax, endPointsOfContours, instructions, points);
 			}
 			else // If the number of contours less than zero, the glyph is compound
 			{
@@ -258,7 +258,7 @@ internal sealed class GlyfTable
 						instructions[i] = reader.ReadU8();
 				}
 
-				glyph = new CompoundGlyphOutline(xMin, yMin, xMax, yMax, components.ToArray(), instructions);
+				glyph = new CompoundGlyphOutline(font, xMin, yMin, xMax, yMax, components.ToArray(), instructions);
 			}
 
 			outlinesByIndex.Add(locaIndex, glyph);

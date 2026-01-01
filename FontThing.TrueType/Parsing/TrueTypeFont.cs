@@ -1,4 +1,6 @@
 using FontThing.TrueType.Parsing.Tables;
+using System.Drawing;
+using System.Text;
 using UtilThing;
 
 namespace FontThing.TrueType.Parsing;
@@ -17,8 +19,6 @@ public sealed class TrueTypeFont
 	public short Ascent => _hheaTable.Ascent;
 	public short Descent => _hheaTable.Descent;
 	public short LineGap => _hheaTable.LineGap;
-	
-	public ushort UnitsPerEm => _headTable.UnitsPerEm;
 
 	public TrueTypeFont(Stream stream)
 	{
@@ -49,23 +49,23 @@ public sealed class TrueTypeFont
 
 		_cmapTable = new(CreateTableReader(reader, cmapDir));
 		_locaTable = new(CreateTableReader(reader, locaDir), _headTable);
-		_glyfTable = new(CreateTableReader(reader, glyfDir), _locaTable);
+		_glyfTable = new(CreateTableReader(reader, glyfDir), this, _locaTable);
 		_hmtxTable = new(CreateTableReader(reader, hmtxDir), maxpTable, _hheaTable);
 
 		// TODO: name: naming
 		// TODO: post: postscript
 	}
 
-	public float PointSizeToScale(float pointSize) => pointSize * 96.0f / (72.0f * UnitsPerEm);
+	public float PointSizeToScale(float pointSize) => pointSize * 96.0f / (72.0f * _headTable.UnitsPerEm);
 
 	public float GetPixelsPerEm(float pointSize) => pointSize * 96.0f / 72.0f;
 
-	public GlyphOutline? GetGlyphOutline(uint c)
+	internal GlyphOutline? GetGlyphOutlineFromCharacter(uint c)
 	{
 		var glyphIndex = _cmapTable.GetGlyphIndex(c);
-	
+
 		var glyphOffset = _locaTable.Offsets[glyphIndex];
-		
+
 		var nextGlyphIndex = glyphIndex + 1;
 		if (nextGlyphIndex < _locaTable.Offsets.Length)
 		{
@@ -73,7 +73,23 @@ public sealed class TrueTypeFont
 			if (glyphOffset == glyphOffsetNext)
 				return null;
 		}
-		
+
+		var glyph = _glyfTable.OutlinesByLocation[glyphOffset];
+		return glyph;
+	}
+	
+	internal GlyphOutline? GetGlyphOutlineFromIndex(uint glyphIndex)
+	{
+		var glyphOffset = _locaTable.Offsets[glyphIndex];
+
+		var nextGlyphIndex = glyphIndex + 1;
+		if (nextGlyphIndex < _locaTable.Offsets.Length)
+		{
+			var glyphOffsetNext = _locaTable.Offsets[glyphIndex + 1];
+			if (glyphOffset == glyphOffsetNext)
+				return null;
+		}
+
 		var glyph = _glyfTable.OutlinesByLocation[glyphOffset];
 		return glyph;
 	}
@@ -82,6 +98,14 @@ public sealed class TrueTypeFont
 	{
 		var glyphIndex = _cmapTable.GetGlyphIndex(c);
 		return _hmtxTable.GetLongHorMetric(glyphIndex);
+	}
+
+	public Glyph LoadGlyph(char character)
+		=> LoadGlyph(new Rune(character));
+
+	public Glyph LoadGlyph(Rune rune)
+	{
+		return new(this, rune, GetGlyphOutlineFromCharacter((uint)rune.Value));
 	}
 
 	private static TableDirectory GetTableDirectoryByTagValue(FontDirectory fontDirectory, uint tagValue)

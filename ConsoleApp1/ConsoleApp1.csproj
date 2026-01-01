@@ -9,7 +9,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\AppThing\AppThing.csproj" />
-      <ProjectReference Include="..\FontThing\FontThing.csproj" />
+      <ProjectReference Include="..\FontThing.TrueType\FontThing.TrueType.csproj" />
     </ItemGroup>
 
 </Project>
