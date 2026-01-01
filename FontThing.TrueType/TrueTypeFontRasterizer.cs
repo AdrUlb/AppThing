@@ -264,8 +264,8 @@ internal static class TrueTypeFontRasterizer
 					var scaledY = p.X * (float)component.Scale10 + p.Y * (float)component.ScaleY;
 
 					// Apply translation
-					scaledX += component.Arg1;
-					scaledY += component.Arg2;
+					scaledX += component.Arg1 * scale;
+					scaledY += component.Arg2 * scale;
 
 					p = new(scaledX, scaledY);
 				}
