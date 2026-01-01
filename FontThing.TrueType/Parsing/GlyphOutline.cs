@@ -7,8 +7,8 @@ public enum GlyphOutlineRenderOptions
 {
 	None = 0,
 	StemDarkening = 1 << 0,
-	GammaCorrection = 1 << 1,
-	Default = StemDarkening | GammaCorrection,
+	Gamma = 1 << 1,
+	Default = StemDarkening,
 }
 
 public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax)
@@ -26,12 +26,12 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 		float.Ceiling((YMax - YMin) * scale)
 	);
 
-	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 8, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
+	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 4, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
 	{
 		var scale = Font.PointSizeToScale(pointSize);
 		var stemDarkening = (options & GlyphOutlineRenderOptions.StemDarkening) != 0 ? TrueTypeFontRasterizer.CalculateStemDarkening(Font.GetPixelsPerEm(pointSize)) : 0;
 
-		var gamma = (options & GlyphOutlineRenderOptions.GammaCorrection) != 0 ? 1.2f : 1.0f;
+		var gamma = (options & GlyphOutlineRenderOptions.Gamma) != 0 ? 1.2f : 1.0f;
 
 		return TrueTypeFontRasterizer.RenderGlyph(
 			this,

@@ -85,7 +85,7 @@ internal sealed class QuadRenderer : IDisposable
 
 	private readonly Dictionary<Texture, GLTexture> _textureMap = [];
 	private readonly HashSet<Texture> _disposedTextures = [];
-	private readonly HashSet<Texture> _changedTextures = [];
+	private readonly Dictionary<Texture, Rectangle> _changedTextures = [];
 	private readonly Lock _disposedTexturesLock = new();
 	private readonly Lock _changedTexturesLock = new();
 	private Texture? _currentTexture = null;
@@ -184,7 +184,7 @@ internal sealed class QuadRenderer : IDisposable
 			_instanceAttribs.Clear();
 		}
 
-		HandleTextures();
+		HandleDisposedTextures();
 	}
 
 	private void AddQuad(InstanceAttribs attribs, Texture texture)
@@ -194,8 +194,9 @@ internal sealed class QuadRenderer : IDisposable
 
 		bool textureChanged;
 
+		Rectangle changedRegion;
 		lock (_changedTexturesLock)
-			textureChanged = _changedTextures.Contains(texture);
+			textureChanged = _changedTextures.TryGetValue(texture, out changedRegion);
 
 		if (quadLimitReached || textureChanged || textureDifferent)
 			Commit();
@@ -205,17 +206,20 @@ internal sealed class QuadRenderer : IDisposable
 		_currentTexture = texture;
 
 		if (newTexture || textureChanged)
-			HandleChangedTexture(texture);
+		{
+			HandleChangedTexture(texture, textureChanged ? changedRegion : new(new(0, 0), texture.Size));
+			lock (_changedTexturesLock)
+				_changedTextures.Remove(texture);
+		}
 
 		// Push vertices
 		_instanceAttribs.Add(attribs);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private void HandleTextures()
+	private void HandleDisposedTextures()
 	{
 		lock (_disposedTexturesLock)
-		lock (_changedTexturesLock)
 		{
 			foreach (var texture in _disposedTextures)
 			{
@@ -224,53 +228,46 @@ internal sealed class QuadRenderer : IDisposable
 
 				glTexture.Dispose();
 				_textureMap.Remove(texture);
-				_changedTextures.Remove(texture);
 				texture.Changed -= Texture_Changed;
 				texture.Disposed -= Texture_Disposed;
 			}
 
-			foreach (var texture in _changedTextures)
-				HandleChangedTexture(texture);
-
 			_disposedTextures.Clear();
-			_changedTextures.Clear();
 		}
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private void HandleChangedTexture(Texture texture)
+	private void HandleChangedTexture(Texture texture, Rectangle region)
 	{
 		if (!_textureMap.TryGetValue(texture, out var glTexture))
 			return;
 
 		// Upload new texture data to the GPU
-		var pixelsByteCount = texture.Size.Width * texture.Size.Height * 4;
+		var pixelsByteCount = region.Width * region.Height * 4;
 		var pixels = ArrayPool<byte>.Shared.Rent(pixelsByteCount);
-		texture.AccessPixels((span, size) =>
+		texture.AccessPixels(region, acc =>
 		{
-			for (var y = 0; y < size.Height; y++)
+			for (var y = 0; y < acc.Size.Height; y++)
 			{
-				for (var x = 0; x < size.Width; x++)
+				var row = acc.GetRow(y);
+				for (var x = 0; x < acc.Size.Width; x++)
 				{
-					var color = span[x + y * size.Width];
-					var index = (x + (y * size.Width)) * 4;
+					var color = row[x];
+					var index = (x + (y * acc.Size.Width)) * 4;
 					pixels[index + 0] = color.R;
 					pixels[index + 1] = color.G;
 					pixels[index + 2] = color.B;
 					pixels[index + 3] = color.A;
 				}
 			}
-		});
+		}, true);
 
-		texture.Invalidate();
-
-		glTexture.Image2D(0, InternalFormat.Rgba8, texture.Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan()[..pixelsByteCount]);
+		glTexture.SubImage2D(0, region, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan()[..pixelsByteCount]);
 		ArrayPool<byte>.Shared.Return(pixels);
 		glTexture.GenerateMipmap();
 		GetGlTexture(texture).Bind();
 	}
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private GLTexture GetGlTexture(Texture texture)
 	{
 		// If the texture is already "known", return the corresponding GL texture
@@ -288,21 +285,30 @@ internal sealed class QuadRenderer : IDisposable
 			MagFilter = TextureMagFilter.Linear
 		};
 
+		glTexture.Image2D(0, InternalFormat.Rgba8, texture.Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte);
+
 		// Add the new GL texture to the list of known textures
 		_textureMap.Add(texture, glTexture);
 
 		// Also add the texture to the list of changed textures
 		lock (_changedTexturesLock)
-			_changedTextures.Add(texture);
+			_changedTextures.TryAdd(texture, new Rectangle(new Point(0, 0), texture.Size));
 
 		return glTexture;
 	}
 
 	// Add textures to the appropriate lists for deferred processing
-	private void Texture_Changed(Texture texture)
+	private void Texture_Changed(Texture texture, Rectangle region)
 	{
 		lock (_changedTexturesLock)
-			_changedTextures.Add(texture);
+		{
+			if (!_changedTextures.TryAdd(texture, region))
+			{
+				var existingRegion = _changedTextures[texture];
+				var union = Rectangle.Union(existingRegion, region);
+				_changedTextures[texture] = union;
+			}
+		}
 	}
 
 	private void Texture_Disposed(Texture texture)

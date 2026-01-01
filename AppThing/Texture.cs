@@ -2,13 +2,28 @@ using System.Drawing;
 
 namespace AppThing;
 
+public readonly ref struct TextureRowAccessor(Size size, Span<Color> pixels, int stride)
+{
+	public readonly Size Size = size;
+	private readonly Span<Color> _pixels = pixels;
+
+	public Span<Color> GetRow(int row)
+	{
+		if (row < 0 || row >= Size.Height)
+			throw new ArgumentOutOfRangeException(nameof(row));
+
+		return _pixels.Slice(row * stride, Size.Width);
+	}
+}
+
 public sealed class Texture : IDisposable
 {
-	internal delegate void TextureEventHandler(Texture texture);
-	public delegate void AccessSpanHandler(Span<Color> pixels, Size size);
+	internal delegate void TextureDisposedHandler(Texture texture);
+	internal delegate void TextureChangedHandler(Texture texture, Rectangle region);
+	public delegate void AccessHandler(TextureRowAccessor accessor);
 
-	internal event TextureEventHandler? Disposed;
-	internal event TextureEventHandler? Changed;
+	internal event TextureDisposedHandler? Disposed;
+	internal event TextureChangedHandler? Changed;
 
 	public readonly Size Size;
 
@@ -35,62 +50,20 @@ public sealed class Texture : IDisposable
 		_disposed = true;
 	}
 
-	public void Invalidate() => Changed?.Invoke(this);
+	private void Invalidate(Rectangle region) => Changed?.Invoke(this, region);
 
-	public void AccessPixels(AccessSpanHandler handler)
+	public void AccessPixels(AccessHandler handler)
 	{
 		ArgumentNullException.ThrowIfNull(handler);
-		handler(_pixels.AsSpan(), Size);
-		Invalidate();
+		handler(new(Size, _pixels.AsSpan(), Size.Width));
+		Invalidate(new(new Point(0, 0), Size));
 	}
-	
-	/*
-	public Color this[int index]
+
+	public void AccessPixels(Rectangle rect, AccessHandler handler, bool dontInvalidate = false)
 	{
-		get
-		{
-			if (index < 0 || index >= _pixels.Length)
-				throw new ArgumentOutOfRangeException(nameof(index));
-
-			return _pixels[index];
-		}
-
-		set
-		{
-			if (index < 0 || index >= _pixels.Length)
-				throw new ArgumentOutOfRangeException(nameof(index));
-
-			_pixels[index] = value;
-			Invalidate();
-		}
+		ArgumentNullException.ThrowIfNull(handler);
+		handler(new(rect.Size, _pixels.AsSpan()[(rect.X + rect.Y * Size.Width)..], Size.Width));
+		if (!dontInvalidate)
+			Invalidate(rect);
 	}
-
-	public Color this[int x, int y]
-	{
-		get
-		{
-			if (x < 0 || x >= Size.Width)
-				throw new ArgumentOutOfRangeException(nameof(x));
-
-			if (y < 0 || y >= Size.Height)
-				throw new ArgumentOutOfRangeException(nameof(y));
-
-			var index = x + (y * Size.Width);
-			return _pixels[index];
-		}
-
-		set
-		{
-			if (x < 0 || x >= Size.Width)
-				throw new ArgumentOutOfRangeException(nameof(x));
-
-			if (y < 0 || y >= Size.Height)
-				throw new ArgumentOutOfRangeException(nameof(y));
-
-			var index = x + (y * Size.Width);
-			_pixels[index] = value;
-			Invalidate();
-		}
-	}
-	*/
 }

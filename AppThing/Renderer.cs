@@ -1,6 +1,7 @@
 using GLCS;
 using GLCS.Managed;
 using SDL3CS;
+using System.Buffers;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -19,9 +20,9 @@ public sealed class Renderer : IDisposable
 	private bool _disposed;
 	private Size _size;
 	private volatile bool _sizeChanged = false;
-	
+
 	public Color ClearColor { get; set; } = Color.Black;
-	
+
 	internal Renderer(Window window)
 	{
 		_window = window;
@@ -123,22 +124,52 @@ public sealed class Renderer : IDisposable
 		_quadBatch.Commit();
 		_msaaBuffer.EndFrame();
 		_msaaBuffer.Blit();
-		
+
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect, Color color, in Matrix4x4 transformation) => _quadBatch.Draw(texture, destRect, sourceRect, transformation, color);
+	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect, Color color, in Matrix4x4 transformation) => _quadBatch.Draw(texture, destRect, sourceRect, transformation, color);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect, Color color) => Draw(texture, destRect, sourceRect, color, Matrix4x4.Identity);
+	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect, Color color) => Draw(texture, destRect, sourceRect, color, Matrix4x4.Identity);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect) => Draw(texture, destRect, sourceRect, Color.White);
+	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect) => Draw(texture, destRect, sourceRect, Color.White);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, RectangleF destRect) => Draw(texture, destRect, new(Point.Empty, texture.Size));
+	public void Draw(Texture texture, Rectangle destRect) => Draw(texture, destRect, new(Point.Empty, texture.Size));
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, PointF location) => Draw(texture, new RectangleF(location, texture.Size));
+	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
+
+	public void DrawText(string str, Point location, RenderFont font, Color color)
+	{
+		var chars = ArrayPool<RendererChar>.Shared.Rent(str.Length);
+		var charCount = 0;
+
+		var penX = 0L;
+		var penY = 0L;
+
+		foreach (var c in str)
+		{
+			if (font.TryGetGlyph(new(c), ref penX, ref penY, out var fontGlyph, out var drawPos))
+				chars[charCount++] = new(drawPos, fontGlyph);
+		}
+
+		for (var i = 0; i < charCount; i++)
+		{
+			var charInfo = chars[i];
+			Draw(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color);
+		}
+
+		ArrayPool<RendererChar>.Shared.Return(chars);
+	}
+
+	internal readonly struct RendererChar(Point dest, RenderFontGlyph glyph)
+	{
+		public readonly Point Dest = dest;
+		public readonly RenderFontGlyph Glyph = glyph;
+	}
+
 }

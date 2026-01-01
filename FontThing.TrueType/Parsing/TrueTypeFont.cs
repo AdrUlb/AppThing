@@ -20,6 +20,8 @@ public sealed class TrueTypeFont
 	public short Descent => _hheaTable.Descent;
 	public short LineGap => _hheaTable.LineGap;
 
+	public int LineHeight => Ascent - Descent + LineGap;
+
 	public TrueTypeFont(Stream stream)
 	{
 		using var reader = new StreamPrimitiveReader(stream.SubStream(stream.Position, stream.Length - stream.Position), false);
@@ -77,7 +79,7 @@ public sealed class TrueTypeFont
 		var glyph = _glyfTable.OutlinesByLocation[glyphOffset];
 		return glyph;
 	}
-	
+
 	internal GlyphOutline? GetGlyphOutlineFromIndex(uint glyphIndex)
 	{
 		var glyphOffset = _locaTable.Offsets[glyphIndex];

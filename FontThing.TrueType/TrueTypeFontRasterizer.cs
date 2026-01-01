@@ -3,8 +3,6 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using FontThing.TrueType.Parsing;
-using System.Drawing;
-using System.Text;
 using UtilThing;
 
 namespace FontThing.TrueType;
@@ -15,7 +13,7 @@ internal static class TrueTypeFontRasterizer
 	{
 		const float minPpem = 10.0f;
 		const float maxPpem = 36.0f;
-		const float maxDarkening = 0.25f;
+		const float maxDarkening = 0.35f;
 
 		if (pixelsPerEm <= minPpem)
 			return maxDarkening;
@@ -68,7 +66,7 @@ internal static class TrueTypeFontRasterizer
 						var prevLit = supersamples >= 4 && supersampled[xx + prevRowOffset];
 						var nextLit = supersamples >= 4 && supersampled[xx + nextRowOffset];
 
-						if (lit || prevLit || nextLit)
+						if (lit /*|| prevLit || nextLit*/)
 							a += downsampledPixelContrib;
 					}
 				}
