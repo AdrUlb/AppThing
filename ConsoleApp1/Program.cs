@@ -18,11 +18,12 @@ const float pointSize = 40.0f;
 var scale = font.PointSizeToScale(pointSize);
 
 var lineHeight = font.Ascent - font.Descent + font.LineGap;
-var baseline = font.Ascent;
 
 window.Visible = true;
 
 var lastTimestamp = Stopwatch.GetTimestamp();
+
+var textColor = Color.FromArgb(147, 161, 161);
 
 window.Draw += (renderer, delta) =>
 {
@@ -42,9 +43,10 @@ window.Draw += (renderer, delta) =>
 			continue;
 		}
 
-		var metrics = font.GetLongHorMetrics(c);
-
 		var glyph = font.LoadGlyph(c);
+
+		if (penX == 0.0f)
+			penX -= glyph.LeftSideBearing;
 
 		if (glyph.Outline != null)
 		{
@@ -70,7 +72,7 @@ window.Draw += (renderer, delta) =>
 					for (var x = 0; x < bitmap.Size.Width; x++)
 					{
 						var a = bitmap.Data[x + (size.Height - y - 1) * size.Width];
-						pixels[x + y * size.Width] = Color.FromArgb(a, 147, 161, 161);
+						pixels[x + y * size.Width] = Color.FromArgb((byte)((a / 255.0f) * (textColor.A / 255.0f) * 255.0f), textColor);
 					}
 				}
 			});
@@ -78,7 +80,7 @@ window.Draw += (renderer, delta) =>
 			renderer.Draw(texture, new RectangleF(new(drawX, drawY), texture.Size));
 		}
 
-		penX += metrics.AdvanceWidth;
+		penX += glyph.AdvanceWidth;
 	}
 };
 

@@ -15,6 +15,7 @@ public readonly struct Glyph
 	public readonly Rune Character;
 	public readonly GlyphOutline? Outline;
 	public readonly uint AdvanceWidth;
+	public readonly short LeftSideBearing;
 
 	public Glyph(TrueTypeFont font, Rune character, GlyphOutline? outline)
 	{
@@ -23,5 +24,6 @@ public readonly struct Glyph
 		Outline = outline;
 		var metrics = font.GetLongHorMetrics((uint)character.Value);
 		AdvanceWidth = metrics.AdvanceWidth;
+		LeftSideBearing = metrics.LeftSideBearing;
 	}
 }

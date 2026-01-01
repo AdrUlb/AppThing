@@ -94,7 +94,7 @@ public sealed class TrueTypeFont
 		return glyph;
 	}
 
-	public LongHorMetric GetLongHorMetrics(uint c)
+	internal LongHorMetric GetLongHorMetrics(uint c)
 	{
 		var glyphIndex = _cmapTable.GetGlyphIndex(c);
 		return _hmtxTable.GetLongHorMetric(glyphIndex);
