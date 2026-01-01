@@ -10,10 +10,10 @@ using var window = new Window("Test Window", new(1280, 720));
 window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
 TrueTypeFont font;
-using (var stream = File.OpenRead("/usr/share/fonts/TTF/calibri.ttf"))
+using (var stream = File.OpenRead("/usr/share/fonts/TTF/segoeui.ttf"))
 	font = new(stream);
 
-const float pointSize = 60.0f;
+const float pointSize = 40.0f;
 
 var scale = font.PointSizeToScale(pointSize);
 
@@ -49,7 +49,7 @@ window.Draw += (renderer, delta) =>
 		if (glyph.Outline != null)
 		{
 			var glyphXPrecise = (penX + glyph.Outline.XMin) * scale;
-			var glyphYPrecise = (penY + glyph.Outline.YMin - baseline) * scale;
+			var glyphYPrecise = (penY + glyph.Outline.YMin - lineHeight) * scale;
 
 			var glyphX = (int)glyphXPrecise;
 			var glyphY = (int)glyphYPrecise;
