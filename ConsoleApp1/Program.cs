@@ -3,6 +3,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using Color = System.Drawing.Color;
+using Point = System.Drawing.Point;
 
 using var window = new Window("Test Window", new(1280, 720));
 
@@ -23,6 +24,7 @@ window.Draw += (renderer, delta) =>
 
 	var str = $"Frame time: {elapsedSeconds * 1000.0f:F3}ms\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.";
 	renderer.DrawText(str, new(0, 0), font, textColor);
+	renderer.Draw(font._textureAtlases[0].Texture, new Point(0, 0));
 };
 
 window.CloseRequested += w =>
@@ -51,5 +53,6 @@ for (var i = 0; i < font._textureAtlases.Count; i++)
 			}
 		}
 	});
+
 	image.Save(path);
 }

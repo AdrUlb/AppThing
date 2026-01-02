@@ -15,11 +15,14 @@ public sealed class Renderer : IDisposable
 
 	private readonly Sdl.GLContext _glContext;
 	private readonly MultisampleFramebuffer _msaaBuffer;
+	internal readonly TextureManager TextureManager;
 	private readonly QuadRenderer _quadBatch;
 	private readonly int _msaaSamples;
 	private bool _disposed;
 	private Size _size;
 	private volatile bool _sizeChanged = false;
+
+	private BatchRenderer? _currentBatch = null;
 
 	public Color ClearColor { get; set; } = Color.Black;
 
@@ -40,7 +43,8 @@ public sealed class Renderer : IDisposable
 		MakeCurrent();
 
 		_msaaBuffer = new(supportDepthBuffer: false);
-		_quadBatch = new();
+		TextureManager = new();
+		_quadBatch = new(this);
 
 		Console.WriteLine($"[Renderer] OpenGL Renderer: {Gl.GetString(StringName.Renderer)}");
 		Console.WriteLine($"[Renderer] OpenGL Version: {Gl.GetString(StringName.Version)}");
@@ -67,6 +71,7 @@ public sealed class Renderer : IDisposable
 
 		_msaaBuffer.Dispose();
 		_quadBatch.Dispose();
+		TextureManager.Dispose();
 		_disposed = true;
 
 		DoneCurrent();
@@ -121,15 +126,19 @@ public sealed class Renderer : IDisposable
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	internal void EndFrame()
 	{
-		_quadBatch.Commit();
+		_currentBatch?.Commit();
 		_msaaBuffer.EndFrame();
 		_msaaBuffer.Blit();
+		TextureManager.EndFrame();
 
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect, Color color, in Matrix4x4 transformation) => _quadBatch.Draw(texture, destRect, sourceRect, transformation, color);
+	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect, Color color, in Matrix4x4 transformation)
+	{
+		UseBatch(_quadBatch).Draw(texture, destRect, sourceRect, color, transformation);
+	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect, Color color) => Draw(texture, destRect, sourceRect, color, Matrix4x4.Identity);
@@ -172,4 +181,14 @@ public sealed class Renderer : IDisposable
 		public readonly BitmapFontGlyph Glyph = glyph;
 	}
 
+	private T UseBatch<T>(T batch) where T : BatchRenderer
+	{
+		if (_currentBatch != batch)
+		{
+			_currentBatch?.Commit();
+			_currentBatch = batch;
+		}
+
+		return batch;
+	}
 }

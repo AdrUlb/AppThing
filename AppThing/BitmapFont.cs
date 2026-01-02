@@ -129,7 +129,7 @@ public sealed class BitmapFont : IDisposable
 
 		// Create new atlas
 		Console.WriteLine($"[BitmapFont] Creating new texture atlas for size {size.Width}x{size.Height}");
-		var newAtlasTexture = new Texture(new(2048, 2048), Color.Black);
+		var newAtlasTexture = new Texture(new(2048, 2048), Color.Transparent);
 		var newAtlas = new AtlasGenerator(newAtlasTexture);
 		_textureAtlases.Add(newAtlas);
 
