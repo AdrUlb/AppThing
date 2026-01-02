@@ -65,14 +65,15 @@ public sealed class BitmapFont : IDisposable
 		var glyphX = (int)glyphXPrecise;
 		var glyphY = (int)glyphYPrecise;
 
-		//var round = _pixelSize <= 100.0f;
-		var round = false;
 		var subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
 		var subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
-
+		
+		var round = _pixelSize <= 100.0f;
+		
 		/*
 		var subX = float.Round(glyphXPrecise - glyphX, round ? 1 : 0);
 		var subY = float.Round(glyphYPrecise - glyphY, round ? 1 : 0);
+		*/
 
 		if (subX <= -0.0f)
 		{
@@ -85,7 +86,6 @@ public sealed class BitmapFont : IDisposable
 			subY = float.Round(subY + 1, round ? 1 : 0);
 			glyphY--;
 		}
-		*/
 
 		penX += glyph.AdvanceWidth;
 

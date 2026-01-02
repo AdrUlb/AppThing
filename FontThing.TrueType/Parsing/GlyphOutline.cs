@@ -35,11 +35,11 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 4, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
 	{
 		var scale = Font.PointSizeToScale(pointSize);
-		var stemDarkening = (options & GlyphOutlineRenderOptions.StemDarkening) != 0 ? TrueTypeFontRasterizer.CalculateStemDarkening(Font.GetPixelsPerEm(pointSize)) : 0;
+		var stemDarkening = (options & GlyphOutlineRenderOptions.StemDarkening) != 0 ? TrueTypeRasterizer.CalculateStemDarkening(Font.GetPixelsPerEm(pointSize)) : 0;
 
 		var gamma = (options & GlyphOutlineRenderOptions.Gamma) != 0 ? 1.2f : 1.0f;
 
-		return TrueTypeFontRasterizer.RenderGlyph(
+		return TrueTypeRasterizer.RenderGlyph(
 			this,
 			scale,
 			supersamples,

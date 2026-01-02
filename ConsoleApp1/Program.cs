@@ -3,7 +3,6 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using Color = System.Drawing.Color;
-using Point = System.Drawing.Point;
 
 using var window = new Window("Test Window", new(1280, 720));
 
@@ -13,7 +12,7 @@ window.Visible = true;
 
 var lastTimestamp = Stopwatch.GetTimestamp();
 
-var font = BitmapFont.FromFile("/usr/share/fonts/TTF/calibri.ttf", 40.0f);
+var font = BitmapFont.FromFile("/usr/share/fonts/TTF/times.ttf", 40.0f);
 var textColor = Color.FromArgb(147, 161, 161);
 
 window.Draw += (renderer, delta) =>
@@ -23,8 +22,8 @@ window.Draw += (renderer, delta) =>
 	lastTimestamp = thisTimestamp;
 
 	var str = $"Frame time: {elapsedSeconds * 1000.0f:F3}ms\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.";
-	renderer.DrawText(str, new(0, 0), font, textColor);
-	renderer.Draw(font._textureAtlases[0].Texture, new Point(0, 0));
+	renderer.DrawText(str, new(20, 0), font, textColor);
+	//renderer.Draw(font._textureAtlases[0].Texture, new Point(0, 0));
 };
 
 window.CloseRequested += w =>

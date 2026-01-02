@@ -5,7 +5,7 @@ using FontThing.TrueType.Parsing;
 
 namespace FontThing.TrueType;
 
-internal static class TrueTypeFontRasterizer
+internal static class TrueTypeRasterizer
 {
 	public static float CalculateStemDarkening(float pixelsPerEm)
 	{
@@ -26,19 +26,18 @@ internal static class TrueTypeFontRasterizer
 	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, float scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma)
 	{
 		var gammaTable = GenerateGammaTable(gamma);
-		var contours = glyphOutline.GenerateContours(scale * supersamples, bezierTolerance * supersamples);
 
 		var scaledBounds = glyphOutline.GetBounds(scale);
-		var bitmapWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 2;
-		var bitmapHeight = (int)(scaledBounds.Height + subpixelOffsetY) + 2;
+		var bitmapWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 1;
+		var bitmapHeight = (int)(scaledBounds.Height + subpixelOffsetY) + 1;
 
-		var alphaWidth = bitmapWidth * supersamples;
-		var alphaHeight = bitmapHeight * supersamples;
+		var supersampledWidth = bitmapWidth * supersamples;
+		var supersampledHeight = bitmapHeight * supersamples;
 
-		var boolPool = ArrayPool<bool>.Shared;
-		var supersampled = boolPool.Rent(alphaWidth * alphaHeight);
+		var supersampledPool = ArrayPool<bool>.Shared;
+		var supersampled = supersampledPool.Rent(supersampledWidth * supersampledHeight);
 
-		RenderGlyph(contours, scaledBounds.X * supersamples, scaledBounds.Y * supersamples, supersampled, alphaWidth, alphaHeight, (subpixelOffsetX + 1) * supersamples, (subpixelOffsetY + 1) * supersamples, stemDarkeningAmount);
+		RenderGlyph(glyphOutline, scale * supersamples, bezierTolerance, subpixelOffsetX * supersamples, subpixelOffsetY * supersamples, stemDarkeningAmount, supersampled, supersampledWidth, supersampledHeight);
 
 		var bitmap = new byte[bitmapWidth * bitmapHeight];
 		var downsampledPixelContrib = 1.0f / (supersamples * supersamples);
@@ -52,19 +51,13 @@ internal static class TrueTypeFontRasterizer
 				for (var offY = 0; offY < supersamples; offY++)
 				{
 					var yy = y * supersamples + offY;
-					var rowOffset = yy * alphaWidth;
-					var prevRowOffset = (yy > 0) ? (yy - 1) * alphaWidth : rowOffset;
-					var nextRowOffset = (yy < alphaHeight - 1) ? (yy + 1) * alphaWidth : rowOffset;
+					var rowOffset = yy * supersampledWidth;
 
 					for (var offX = 0; offX < supersamples; offX++)
 					{
 						var xx = x * supersamples + offX;
 
-						var lit = supersampled[xx + rowOffset];
-						var prevLit = supersamples >= 4 && supersampled[xx + prevRowOffset];
-						var nextLit = supersamples >= 4 && supersampled[xx + nextRowOffset];
-
-						if (lit /*|| prevLit || nextLit*/)
+						if (supersampled[xx + rowOffset])
 							a += downsampledPixelContrib;
 					}
 				}
@@ -74,7 +67,7 @@ internal static class TrueTypeFontRasterizer
 			}
 		}
 
-		boolPool.Return(supersampled);
+		supersampledPool.Return(supersampled);
 
 		return new(bitmap, new(bitmapWidth, bitmapHeight));
 	}
@@ -97,8 +90,11 @@ internal static class TrueTypeFontRasterizer
 		return table;
 	}
 
-	private static void RenderGlyph(IReadOnlyList<List<Vector2>> contours, float glyphXMin, float glyphYMin, Span<bool> pixels, int width, int height, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount)
+	private static void RenderGlyph(GlyphOutline glyphOutline, float scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
 	{
+		var glyphXMin = glyphOutline.XMin * scale;
+		var glyphYMin = glyphOutline.YMin * scale;
+		var contours = glyphOutline.GenerateContours(scale, bezierTolerance);
 		Debug.Assert(pixels.Length >= width * height);
 
 		var renderOffset = new Vector2(-glyphXMin, -glyphYMin);
