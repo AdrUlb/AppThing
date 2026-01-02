@@ -24,7 +24,7 @@ internal sealed class TextureManager : IDisposable
 		_disposedTextures.Clear();
 		_changedTextures.Clear();
 	}
-	
+
 	public Texture? CurrentTexture { get; private set; } = null;
 
 	public bool Use(Texture texture, bool checkChanges = true)
@@ -57,7 +57,15 @@ internal sealed class TextureManager : IDisposable
 			MagFilter = TextureMagFilter.Linear
 		};
 
-		glTexture.Image2D(0, InternalFormat.Rgba8, texture.Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte);
+		var internalFormat = texture.Format switch
+		{
+			TextureFormat.Rgba => InternalFormat.Rgba8,
+			TextureFormat.Rgb => InternalFormat.Rgb8,
+			TextureFormat.Red => InternalFormat.R8,
+			_ => throw new NotSupportedException($"Unsupported texture format: {texture.Format}")
+		};
+
+		glTexture.Image2D(0, internalFormat, texture.Size, 0, PixelFormat.Rgba, PixelType.UnsignedByte);
 
 		// Add the new GL texture to the list of known textures
 		_textureMap.Add(texture, glTexture);

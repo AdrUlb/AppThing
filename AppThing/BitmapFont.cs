@@ -67,9 +67,9 @@ public sealed class BitmapFont : IDisposable
 
 		var subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
 		var subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
-		
+
 		var round = _pixelSize <= 100.0f;
-		
+
 		/*
 		var subX = float.Round(glyphXPrecise - glyphX, round ? 1 : 0);
 		var subY = float.Round(glyphYPrecise - glyphY, round ? 1 : 0);
@@ -108,7 +108,7 @@ public sealed class BitmapFont : IDisposable
 					for (var x = 0; x < bitmap.Size.Width; x++)
 					{
 						var a = bitmap.Data[x + (acc.Size.Height - y - 1) * acc.Size.Width];
-						row[x] = Color.FromArgb(a, Color.White);
+						row[x] = Color.FromArgb(255, a, a, a);
 					}
 				}
 			});
@@ -129,7 +129,7 @@ public sealed class BitmapFont : IDisposable
 
 		// Create new atlas
 		Console.WriteLine($"[BitmapFont] Creating new texture atlas for size {size.Width}x{size.Height}");
-		var newAtlasTexture = new Texture(new(2048, 2048), Color.Transparent);
+		var newAtlasTexture = new Texture(new(2048, 2048), Color.Transparent, TextureFormat.Red);
 		var newAtlas = new AtlasGenerator(newAtlasTexture);
 		_textureAtlases.Add(newAtlas);
 

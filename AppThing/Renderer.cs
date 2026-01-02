@@ -17,6 +17,7 @@ public sealed class Renderer : IDisposable
 	private readonly MultisampleFramebuffer _msaaBuffer;
 	internal readonly TextureManager TextureManager;
 	private readonly QuadRenderer _quadBatch;
+	private readonly BitmapFontRenderer _bitmapFontBatch;
 	private readonly int _msaaSamples;
 	private bool _disposed;
 	private Size _size;
@@ -45,6 +46,7 @@ public sealed class Renderer : IDisposable
 		_msaaBuffer = new(supportDepthBuffer: false);
 		TextureManager = new();
 		_quadBatch = new(this);
+		_bitmapFontBatch = new(this);
 
 		Console.WriteLine($"[Renderer] OpenGL Renderer: {Gl.GetString(StringName.Renderer)}");
 		Console.WriteLine($"[Renderer] OpenGL Version: {Gl.GetString(StringName.Version)}");
@@ -71,6 +73,7 @@ public sealed class Renderer : IDisposable
 
 		_msaaBuffer.Dispose();
 		_quadBatch.Dispose();
+		_bitmapFontBatch.Dispose();
 		TextureManager.Dispose();
 		_disposed = true;
 
@@ -111,6 +114,7 @@ public sealed class Renderer : IDisposable
 			Gl.Viewport(0, 0, _size.Width, _size.Height);
 			_msaaBuffer.Setup(_size, _msaaSamples);
 			_quadBatch.HandleSizeChanged(_size);
+			_bitmapFontBatch.HandleSizeChanged(_size);
 			_sizeChanged = false;
 		}
 
@@ -166,10 +170,11 @@ public sealed class Renderer : IDisposable
 				chars[charCount++] = new(drawPos, fontGlyph);
 		}
 
+		UseBatch(_bitmapFontBatch);
 		for (var i = 0; i < charCount; i++)
 		{
 			var charInfo = chars[i];
-			Draw(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color);
+			_bitmapFontBatch.Draw(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
 		}
 
 		ArrayPool<RendererChar>.Shared.Return(chars);

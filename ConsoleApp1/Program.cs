@@ -3,6 +3,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using Color = System.Drawing.Color;
+using Point = System.Drawing.Point;
 
 using var window = new Window("Test Window", new(1280, 720));
 

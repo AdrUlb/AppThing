@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace AppThing;
 
-internal sealed class QuadRenderer : BatchRenderer, IDisposable
+internal sealed class BitmapFontRenderer : BatchRenderer, IDisposable
 {
 	private readonly struct VertexAttribs(Vector2 position)
 	{
@@ -68,7 +68,7 @@ internal sealed class QuadRenderer : BatchRenderer, IDisposable
 		void main()
 		{
 			vec4 texColor = texture(uTexture, vTexCoord);
-			FragColor = vColor * texColor;
+			FragColor = vec4(vColor.rgb, vColor.a * texColor.r);
 		}
 		""";
 
@@ -91,7 +91,7 @@ internal sealed class QuadRenderer : BatchRenderer, IDisposable
 		get => _instanceAttribs.Count;
 	}
 
-	internal unsafe QuadRenderer(Renderer renderer)
+	internal unsafe BitmapFontRenderer(Renderer renderer)
 	{
 		_renderer = renderer;
 

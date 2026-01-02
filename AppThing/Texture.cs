@@ -16,6 +16,13 @@ public readonly ref struct TextureRowAccessor(Size size, Span<Color> pixels, int
 	}
 }
 
+public enum TextureFormat : byte
+{
+	Rgba,
+	Rgb,
+	Red,
+}
+
 public sealed class Texture : IDisposable
 {
 	internal delegate void TextureDisposedHandler(Texture texture);
@@ -26,13 +33,15 @@ public sealed class Texture : IDisposable
 	internal event TextureChangedHandler? Changed;
 
 	public readonly Size Size;
+	public readonly TextureFormat Format;
 
 	private readonly Color[] _pixels;
 	private bool _disposed;
 
-	public Texture(Size size, Color color)
+	public Texture(Size size, Color color, TextureFormat format = TextureFormat.Rgba)
 	{
 		Size = size;
+		Format = format;
 		_pixels = new Color[size.Width * size.Height];
 		_pixels.AsSpan().Fill(color);
 	}
