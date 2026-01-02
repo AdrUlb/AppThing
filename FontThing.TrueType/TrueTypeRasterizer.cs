@@ -11,7 +11,7 @@ internal static class TrueTypeRasterizer
 	{
 		const float minPpem = 10.0f;
 		const float maxPpem = 36.0f;
-		const float maxDarkening = 0.35f;
+		const float maxDarkening = 0.25f;
 
 		if (pixelsPerEm <= minPpem)
 			return maxDarkening;
@@ -25,7 +25,8 @@ internal static class TrueTypeRasterizer
 
 	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, float scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma)
 	{
-		var gammaTable = GenerateGammaTable(gamma);
+		Span<byte> gammaTable = stackalloc byte[256];
+		GenerateGammaTable(gamma, gammaTable);
 
 		var scaledBounds = glyphOutline.GetBounds(scale);
 		var bitmapWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 1;
@@ -37,7 +38,7 @@ internal static class TrueTypeRasterizer
 		var supersampledPool = ArrayPool<bool>.Shared;
 		var supersampled = supersampledPool.Rent(supersampledWidth * supersampledHeight);
 
-		RenderGlyph(glyphOutline, scale * supersamples, bezierTolerance, subpixelOffsetX * supersamples, subpixelOffsetY * supersamples, stemDarkeningAmount, supersampled, supersampledWidth, supersampledHeight);
+		RenderGlyph(glyphOutline, scale * supersamples, bezierTolerance, subpixelOffsetX * supersamples, subpixelOffsetY * supersamples, stemDarkeningAmount * supersamples, supersampled, supersampledWidth, supersampledHeight);
 
 		var bitmap = new byte[bitmapWidth * bitmapHeight];
 		var downsampledPixelContrib = 1.0f / (supersamples * supersamples);
@@ -72,10 +73,10 @@ internal static class TrueTypeRasterizer
 		return new(bitmap, new(bitmapWidth, bitmapHeight));
 	}
 
-	private static byte[] GenerateGammaTable(float gamma)
+	private static void GenerateGammaTable(float gamma, Span<byte> buffer)
 	{
-		var table = new byte[256];
-		for (var i = 0; i < table.Length; i++)
+		Debug.Assert(buffer.Length >= 256);
+		for (var i = 0; i < buffer.Length; i++)
 		{
 			// Convert to 0-1
 			var linear = i / 255.0f;
@@ -84,10 +85,8 @@ internal static class TrueTypeRasterizer
 			var corrected = MathF.Pow(linear, 1.0f / gamma);
 
 			// Convert back to 0-255
-			table[i] = (byte)Math.Clamp(corrected * 255, 0, 255);
+			buffer[i] = (byte)Math.Clamp(corrected * 255, 0, 255);
 		}
-
-		return table;
 	}
 
 	private static void RenderGlyph(GlyphOutline glyphOutline, float scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
