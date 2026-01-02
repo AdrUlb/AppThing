@@ -5,13 +5,13 @@ using System.Text;
 
 namespace AppThing;
 
-public readonly struct RenderFontGlyph(Texture atlas, Rectangle atlasRegion)
+public readonly struct BitmapFontGlyph(Texture atlas, Rectangle atlasRegion)
 {
 	public readonly Texture Atlas = atlas;
 	public readonly Rectangle AtlasRegion = atlasRegion;
 }
 
-public sealed class RenderFont : IDisposable
+public sealed class BitmapFont : IDisposable
 {
 	public float Size { get; }
 
@@ -20,11 +20,11 @@ public sealed class RenderFont : IDisposable
 
 	private readonly TrueTypeFont _ttf;
 
-	private readonly List<AtlasGenerator> _textureAtlases = [];
+	public readonly List<AtlasGenerator> _textureAtlases = [];
 
-	private readonly Dictionary<(Glyph, float subX, float subY), RenderFontGlyph> _glyphs = [];
+	private readonly Dictionary<(Glyph, float subX, float subY), BitmapFontGlyph> _glyphs = [];
 
-	private RenderFont(TrueTypeFont ttf, float size)
+	private BitmapFont(TrueTypeFont ttf, float size)
 	{
 		_ttf = ttf;
 		Size = size;
@@ -33,14 +33,14 @@ public sealed class RenderFont : IDisposable
 		_scale = ttf.PointSizeToScale(size);
 	}
 
-	public bool TryGetGlyph(Rune character, ref long penX, ref long penY, out RenderFontGlyph renderFontGlyph, out Point drawPos)
+	public bool TryGetGlyph(Rune character, ref long penX, ref long penY, out BitmapFontGlyph bitmapFontGlyph, out Point drawPos)
 	{
 		if (character.Value == '\n')
 		{
 			penX = 0;
 			penY -= _ttf.LineHeight;
 
-			renderFontGlyph = default;
+			bitmapFontGlyph = default;
 			drawPos = Point.Empty;
 			return false;
 		}
@@ -54,7 +54,7 @@ public sealed class RenderFont : IDisposable
 		{
 			penX += glyph.AdvanceWidth;
 
-			renderFontGlyph = default;
+			bitmapFontGlyph = default;
 			drawPos = Point.Empty;
 			return false;
 		}
@@ -65,8 +65,12 @@ public sealed class RenderFont : IDisposable
 		var glyphX = (int)glyphXPrecise;
 		var glyphY = (int)glyphYPrecise;
 
-		var round = _pixelSize <= 100.0f;
+		//var round = _pixelSize <= 100.0f;
+		var round = false;
+		var subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
+		var subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
 
+		/*
 		var subX = float.Round(glyphXPrecise - glyphX, round ? 1 : 0);
 		var subY = float.Round(glyphYPrecise - glyphY, round ? 1 : 0);
 
@@ -81,12 +85,13 @@ public sealed class RenderFont : IDisposable
 			subY = float.Round(subY + 1, round ? 1 : 0);
 			glyphY--;
 		}
+		*/
 
 		penX += glyph.AdvanceWidth;
 
-		if (_glyphs.TryGetValue((glyph, subX, subY), out renderFontGlyph))
+		if (_glyphs.TryGetValue((glyph, subX, subY), out bitmapFontGlyph))
 		{
-			drawPos = new(glyphX, -glyphY - renderFontGlyph.AtlasRegion.Size.Height);
+			drawPos = new(glyphX, -glyphY - bitmapFontGlyph.AtlasRegion.Size.Height);
 			return true;
 		}
 
@@ -108,9 +113,9 @@ public sealed class RenderFont : IDisposable
 				}
 			});
 
-		renderFontGlyph = new(texture, region);
-		_glyphs.Add((glyph, subX, subY), renderFontGlyph);
-		drawPos = new(glyphX, -glyphY - renderFontGlyph.AtlasRegion.Size.Height);
+		bitmapFontGlyph = new(texture, region);
+		_glyphs.Add((glyph, subX, subY), bitmapFontGlyph);
+		drawPos = new(glyphX, -glyphY - bitmapFontGlyph.AtlasRegion.Size.Height);
 		return true;
 	}
 
@@ -123,7 +128,8 @@ public sealed class RenderFont : IDisposable
 		}
 
 		// Create new atlas
-		var newAtlasTexture = new Texture(new(4096, 4096), Color.Black);
+		Console.WriteLine($"[BitmapFont] Creating new texture atlas for size {size.Width}x{size.Height}");
+		var newAtlasTexture = new Texture(new(2048, 2048), Color.Black);
 		var newAtlas = new AtlasGenerator(newAtlasTexture);
 		_textureAtlases.Add(newAtlas);
 
@@ -131,7 +137,7 @@ public sealed class RenderFont : IDisposable
 		return newAtlas.Texture;
 	}
 
-	public static RenderFont FromFile(string path, float size)
+	public static BitmapFont FromFile(string path, float size)
 	{
 		using var fs = File.OpenRead(path);
 		return new(new(fs), size);

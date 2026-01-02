@@ -143,7 +143,7 @@ public sealed class Renderer : IDisposable
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
 
-	public void DrawText(string str, Point location, RenderFont font, Color color)
+	public void DrawText(string str, Point location, BitmapFont font, Color color)
 	{
 		var chars = ArrayPool<RendererChar>.Shared.Rent(str.Length);
 		var charCount = 0;
@@ -166,10 +166,10 @@ public sealed class Renderer : IDisposable
 		ArrayPool<RendererChar>.Shared.Return(chars);
 	}
 
-	internal readonly struct RendererChar(Point dest, RenderFontGlyph glyph)
+	internal readonly struct RendererChar(Point dest, BitmapFontGlyph glyph)
 	{
 		public readonly Point Dest = dest;
-		public readonly RenderFontGlyph Glyph = glyph;
+		public readonly BitmapFontGlyph Glyph = glyph;
 	}
 
 }

@@ -260,7 +260,7 @@ internal sealed class QuadRenderer : IDisposable
 					pixels[index + 3] = color.A;
 				}
 			}
-		}, true);
+		}, false);
 
 		glTexture.SubImage2D(0, region, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan()[..pixelsByteCount]);
 		ArrayPool<byte>.Shared.Return(pixels);

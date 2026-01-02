@@ -52,18 +52,21 @@ public sealed class Texture : IDisposable
 
 	private void Invalidate(Rectangle region) => Changed?.Invoke(this, region);
 
-	public void AccessPixels(AccessHandler handler)
+	public void AccessPixels(AccessHandler handler, bool invalidate = true)
 	{
 		ArgumentNullException.ThrowIfNull(handler);
 		handler(new(Size, _pixels.AsSpan(), Size.Width));
-		Invalidate(new(new Point(0, 0), Size));
+		if (invalidate)
+			Invalidate(new(new(0, 0), Size));
 	}
 
-	public void AccessPixels(Rectangle rect, AccessHandler handler, bool dontInvalidate = false)
+	public void AccessPixels(Rectangle rect, AccessHandler handler, bool invalidate = true)
 	{
 		ArgumentNullException.ThrowIfNull(handler);
 		handler(new(rect.Size, _pixels.AsSpan()[(rect.X + rect.Y * Size.Width)..], Size.Width));
-		if (!dontInvalidate)
+		if (invalidate)
 			Invalidate(rect);
 	}
+	
+	public Span<Color> UnsafeGetPixelsSpan() => _pixels.AsSpan();
 }
