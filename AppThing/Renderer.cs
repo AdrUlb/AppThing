@@ -19,9 +19,9 @@ public sealed class Renderer : IDisposable
 	internal readonly TextureManager TextureManager;
 	private readonly QuadRenderer _quadBatch;
 	private readonly BitmapFontRenderer _bitmapFontBatch;
-	private readonly TestRenderer _testBatch;
+	private readonly VectorFontRenderer _vectorFontBatch;
 	private readonly int _msaaSamples;
-	
+
 	internal Matrix4x4 Projection;
 	private bool _disposed;
 	private Size _size;
@@ -51,7 +51,7 @@ public sealed class Renderer : IDisposable
 		TextureManager = new();
 		_quadBatch = new(this);
 		_bitmapFontBatch = new(this);
-		_testBatch = new(this);
+		_vectorFontBatch = new(this);
 
 		Console.WriteLine($"[Renderer] OpenGL Renderer: {Gl.GetString(StringName.Renderer)}");
 		Console.WriteLine($"[Renderer] OpenGL Version: {Gl.GetString(StringName.Version)}");
@@ -79,8 +79,8 @@ public sealed class Renderer : IDisposable
 		_msaaBuffer.Dispose();
 		_quadBatch.Dispose();
 		_bitmapFontBatch.Dispose();
-		_testBatch.Dispose();
-		
+		_vectorFontBatch.Dispose();
+
 		TextureManager.Dispose();
 		_disposed = true;
 
@@ -120,15 +120,15 @@ public sealed class Renderer : IDisposable
 		{
 			Gl.Viewport(0, 0, _size.Width, _size.Height);
 			Projection = Matrix4x4.CreateOrthographicOffCenter(0, _size.Width, _size.Height, 0, -100.0f, 100.0f);
-			
-			//_msaaBuffer.Setup(_size, _msaaSamples);
-			//_quadBatch.HandleSizeChanged(_size);
+
+			_msaaBuffer.Setup(_size, _msaaSamples);
+			_quadBatch.HandleSizeChanged(_size);
 			_bitmapFontBatch.HandleSizeChanged(_size);
-			_testBatch.HandleSizeChanged(_size);
+			_vectorFontBatch.HandleSizeChanged(_size);
 			_sizeChanged = false;
 		}
 
-		//_msaaBuffer.BeginFrame();
+		_msaaBuffer.BeginFrame();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -141,8 +141,8 @@ public sealed class Renderer : IDisposable
 	internal void EndFrame()
 	{
 		_currentBatch?.Commit();
-		//_msaaBuffer.EndFrame();
-		//_msaaBuffer.Blit();
+		_msaaBuffer.EndFrame();
+		_msaaBuffer.Blit();
 		TextureManager.EndFrame();
 
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
@@ -184,13 +184,13 @@ public sealed class Renderer : IDisposable
 		for (var i = 0; i < charCount; i++)
 		{
 			var charInfo = chars[i];
-			_bitmapFontBatch.Draw(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
+			_bitmapFontBatch.DrawGlyph(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
 		}
 
 		ArrayPool<RendererChar>.Shared.Return(chars);
 	}
 
-	public void Test(TrueTypeFont font) => UseBatch(_testBatch).Test(font);
+	public void DrawText(string str, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(str, location, font, size, color);
 
 	internal readonly struct RendererChar(Point dest, BitmapFontGlyph glyph)
 	{

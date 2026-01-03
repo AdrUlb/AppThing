@@ -138,7 +138,7 @@ internal sealed class BitmapFontRenderer : BatchRenderer, IDisposable
 		_instanceAttribs.Capacity = 0;
 	}
 
-	public void Draw(Texture texture, RectangleF destRect, RectangleF sourceRect, Color color, in Matrix4x4 transformation)
+	public void DrawGlyph(Texture texture, RectangleF destRect, RectangleF sourceRect, Color color, in Matrix4x4 transformation)
 	{
 		var model =
 			Matrix4x4.CreateScale(destRect.Width, destRect.Height, 1.0f) *

@@ -11,13 +11,14 @@ namespace ConsoleApp1;
 
 internal static class Program
 {
+	/*
 	private static void Main(string[] args)
 	{
 		using var window = new Window("Test Window", new(1280, 720));
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/comic.ttf");
+		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/times.ttf");
 
 		window.Visible = true;
 
@@ -40,21 +41,25 @@ internal static class Program
 
 		App.Run();
 	}
-	 
-	/*
+	*/
+
 	private static void Main(string[] args)
 	{
 		using var window = new Window("Test Window", new(1280, 720));
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		var font = BitmapFont.FromFile("/usr/share/fonts/TTF/times.ttf", 20.0f);
+		//var font = BitmapFont.FromFile("/usr/share/fonts/TTF/times.ttf", 500.0f);
+		var font = VectorFont.FromFile("/usr/share/fonts/TTF/times.ttf");
+
 		var textColor = Color.FromArgb(147, 161, 161);
 
 		window.Visible = true;
 
 		var lastTimestamp = Stopwatch.GetTimestamp();
 
+		var size = 10.0f;
+		
 		window.Draw += (renderer, delta) =>
 		{
 			var thisTimestamp = Stopwatch.GetTimestamp();
@@ -63,7 +68,12 @@ internal static class Program
 
 			var str = $"Frame time: {elapsedSeconds * 1000.0f:F3}ms\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.";
 			//var str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789\n!@#$%^&*()_+-=[]{}|;':\",.<>/?`~";
-			renderer.DrawText(str, new(20, 0), font, textColor);
+			//renderer.DrawText("Hello, World!\nTest", new(0, 0), font, textColor);
+
+			//renderer.DrawText(str, new(0, 0), font, textColor);
+			renderer.DrawText(str, new(10, 0), font, size, textColor);
+
+			size += delta * 0.01f;
 		};
 
 		window.CloseRequested += w =>
@@ -73,28 +83,5 @@ internal static class Program
 		};
 
 		App.Run();
-
-		for (var i = 0; i < font._textureAtlases.Count; i++)
-		{
-			var atlas = font._textureAtlases[i];
-			var path = $"atlas{i}.png";
-			var image = new Image<Rgba32>(atlas.Texture.Size.Width, atlas.Texture.Size.Height);
-			image.ProcessPixelRows(acc =>
-			{
-				var span = atlas.Texture.UnsafeGetPixelsSpan();
-				for (var y = 0; y < acc.Height; y++)
-				{
-					var row = acc.GetRowSpan(y);
-					for (var x = 0; x < acc.Width; x++)
-					{
-						var color = span[x + (y * acc.Width)];
-						row[x] = new Rgba32(color.R, color.G, color.B, color.A);
-					}
-				}
-			});
-
-			image.Save(path);
-		}
 	}
-	*/
 }

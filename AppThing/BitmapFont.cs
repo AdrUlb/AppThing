@@ -1,5 +1,4 @@
 using FontThing.TrueType.Parsing;
-using System.Diagnostics;
 using System.Drawing;
 using System.Text;
 
