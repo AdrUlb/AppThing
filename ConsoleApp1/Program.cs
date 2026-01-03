@@ -49,8 +49,11 @@ internal static class Program
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		//var font = BitmapFont.FromFile("/usr/share/fonts/TTF/times.ttf", 500.0f);
-		var font = VectorFont.FromFile("/usr/share/fonts/TTF/times.ttf");
+		const string fontFile = "/usr/share/fonts/TTF/calibri.ttf";
+		var fontSize = 50.0f;
+
+		//var font = BitmapFont.FromFile(fontFile, fontSize);
+		var font = VectorFont.FromFile(fontFile);
 
 		var textColor = Color.FromArgb(147, 161, 161);
 
@@ -58,8 +61,6 @@ internal static class Program
 
 		var lastTimestamp = Stopwatch.GetTimestamp();
 
-		var size = 10.0f;
-		
 		window.Draw += (renderer, delta) =>
 		{
 			var thisTimestamp = Stopwatch.GetTimestamp();
@@ -70,10 +71,10 @@ internal static class Program
 			//var str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789\n!@#$%^&*()_+-=[]{}|;':\",.<>/?`~";
 			//renderer.DrawText("Hello, World!\nTest", new(0, 0), font, textColor);
 
-			//renderer.DrawText(str, new(0, 0), font, textColor);
-			renderer.DrawText(str, new(10, 0), font, size, textColor);
+			//renderer.DrawText(str, new(10, 0), font, textColor);
+			renderer.DrawText(str, new(10, 0), font, fontSize, textColor);
 
-			size += delta * 0.01f;
+			//size += delta * 0.01f;
 		};
 
 		window.CloseRequested += w =>

@@ -186,7 +186,7 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 
 	internal void DrawText(string str, Point location, VectorFont font, float size, Color color)
 	{
-		var scale = font._ttf.PointSizeToScale(size);
+		var scale = font.Ttf.PointSizeToScale(size);
 		var colorVec = new Vector4(color.R / 255.0f, color.G / 255.0f, color.B / 255.0f, color.A / 255.0f);
 
 		var pen = new Vector2(0, 0);
@@ -198,11 +198,11 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 			if (rune.Value == '\n')
 			{
 				pen.X = 0;
-				pen.Y -= font._ttf.LineHeight;
+				pen.Y -= font.Ttf.LineHeight;
 				continue;
 			}
 
-			var glyph = font._ttf.LoadGlyph(rune);
+			var glyph = font.Ttf.LoadGlyph(rune);
 
 			if (first)
 				pen.X -= glyph.LeftSideBearing;
@@ -215,21 +215,36 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 				continue;
 			}
 
-			if (!font.TryGetGlyph(glyph, out var glyph2))
+			if (outline is not SimpleGlyphOutline simpleOutline)
 				continue;
 
-			var renderPos = new Vector2(pen.X, font._ttf.LineHeight - pen.Y);
+			var renderPos = new Vector2(pen.X, font.Ttf.LineHeight - pen.Y) * scale;
 
-			foreach (var vertex in glyph2.Vertices)
+			var contours = simpleOutline.GenerateContours(scale, 0.2f);
+			foreach (var contour in contours)
 			{
-				var v = vertex;
-				v += renderPos;
-				v *= scale;
-				v += new Vector2(location.X, location.Y);
+				var pivot = (ScalePoint(contour[0]));
 
-				_vertices.Add(new(v));
-				var attribs = new SharedVertexAttribs(colorVec);
-				_instanceAttribs.Add(attribs);
+				for (var i = 0; i < contour.Count; i++)
+				{
+					var p0 = (ScalePoint(contour[i]));
+					var p1 = (ScalePoint(contour[(i + 1) % contour.Count]));
+					AddVertex(pivot);
+					AddVertex(p0);
+					AddVertex(p1);
+				}
+
+				continue;
+
+				void AddVertex(Vector2 point)
+				{
+					point += renderPos;
+					point += new Vector2(location.X, location.Y);
+
+					_vertices.Add(new(point));
+					var attribs = new SharedVertexAttribs(colorVec);
+					_instanceAttribs.Add(attribs);
+				}
 			}
 
 			pen.X += glyph.AdvanceWidth;
