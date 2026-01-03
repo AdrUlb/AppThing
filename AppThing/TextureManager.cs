@@ -61,7 +61,7 @@ internal sealed class TextureManager : IDisposable
 		{
 			TextureFormat.Rgba => InternalFormat.Rgba8,
 			TextureFormat.Rgb => InternalFormat.Rgb8,
-			TextureFormat.Red => InternalFormat.R8,
+			TextureFormat.BitmapFont => InternalFormat.Red,
 			_ => throw new NotSupportedException($"Unsupported texture format: {texture.Format}")
 		};
 
@@ -129,7 +129,7 @@ internal sealed class TextureManager : IDisposable
 			{
 				for (var y = 0; y < acc.Size.Height; y++)
 				{
-					var row = acc.GetRow(y);
+					var row = acc.GetRowSpan(y);
 					for (var x = 0; x < acc.Size.Width; x++)
 					{
 						var color = row[x];

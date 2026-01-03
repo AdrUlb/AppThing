@@ -61,7 +61,6 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 	{
 		var contours = new List<Vector2>[EndPointsOfContours.Length];
 
-		// Iterate over all contours
 		var contourStartpointIndex = 0;
 		for (var contourIndex = 0; contourIndex < EndPointsOfContours.Length; contourIndex++)
 		{
@@ -81,22 +80,18 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 		var lines = new List<Vector2>();
 
 		// Find first on-curve point
-		var pointOffset = 0; // Index of first point to actually read in the loop
-		while (!points[pointOffset].OnCurve)
-			pointOffset++;
+		var startOffset = 0; // Index of first point to actually read in the loop
+		while (!points[startOffset].OnCurve)
+			startOffset++;
 
-		var p0Vec = GetScaledGlyphPoint(points[pointOffset++]);
+		var p0Vec = ScalePoint(points[startOffset++]);
 
-		var i = 0;
-		while (i < points.Length)
+		for (var i = 0; i < points.Length; i++)
 		{
-			var index = (i + pointOffset) % points.Length;
+			var index = (i + startOffset) % points.Length;
 
 			var p1 = points[index];
-			var p1Vec = GetScaledGlyphPoint(p1);
-
-			// "Consume" P1
-			i++;
+			var p1Vec = ScalePoint(p1);
 
 			// Two consecutive on-curve points - straight line
 			if (p1.OnCurve)
@@ -106,10 +101,10 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 				continue;
 			}
 
-			index = (i + pointOffset) % points.Length;
+			index = (index + 1) % points.Length;
 
 			var p2 = points[index];
-			var p2Vec = GetScaledGlyphPoint(p2);
+			var p2Vec = ScalePoint(p2);
 
 			if (p2.OnCurve) // Points are: on-curve, off-curve, on-curve - quadratic Bézier
 			{
@@ -129,7 +124,7 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 		// Next contour's start point index immediately follows this contour's endpoint index
 		return lines;
 
-		Vector2 GetScaledGlyphPoint(GlyphPoint point) => new Vector2(point.X, point.Y) * scale;
+		Vector2 ScalePoint(GlyphPoint point) => new Vector2(point.X, point.Y) * scale;
 
 		void AddBezier(Vector2 p0, Vector2 p1, Vector2 p2)
 		{

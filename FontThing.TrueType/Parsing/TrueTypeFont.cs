@@ -58,6 +58,12 @@ public sealed class TrueTypeFont
 		// TODO: post: postscript
 	}
 
+	public static TrueTypeFont FromFile(string path)
+	{
+		using var stream = File.OpenRead(path);
+		return new TrueTypeFont(stream);
+	}
+
 	public float PointSizeToScale(float pointSize) => pointSize * 96.0f / (72.0f * _headTable.UnitsPerEm);
 
 	public float GetPixelsPerEm(float pointSize) => pointSize * 96.0f / 72.0f;
@@ -101,9 +107,6 @@ public sealed class TrueTypeFont
 		var glyphIndex = _cmapTable.GetGlyphIndex(c);
 		return _hmtxTable.GetLongHorMetric(glyphIndex);
 	}
-
-	public Glyph LoadGlyph(char character)
-		=> LoadGlyph(new Rune(character));
 
 	public Glyph LoadGlyph(Rune rune)
 	{

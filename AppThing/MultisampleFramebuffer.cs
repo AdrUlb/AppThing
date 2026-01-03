@@ -68,7 +68,7 @@ internal sealed class MultisampleFramebuffer : IDisposable
 	public void EndFrame() => _framebuffer.UnbindDraw();
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Blit(GLFramebuffer? target, Rectangle sourceRect, Rectangle destRect) => _framebuffer.Blit(target, sourceRect, destRect, ClearBufferMask.ColorBufferBit | (_depthBuffer != null ? ClearBufferMask.DepthBufferBit : 0), BlitFramebufferFilter.Nearest);
+	public void Blit(GLFramebuffer? target, Rectangle sourceRect, Rectangle destRect) => _framebuffer.Blit(target, sourceRect, destRect, ClearBufferMask.ColorBufferBit | (_depthBuffer != null ? ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit : 0), BlitFramebufferFilter.Nearest);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Blit() => Blit(null, new(Point.Empty, _size), new(Point.Empty, _size));

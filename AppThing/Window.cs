@@ -65,6 +65,7 @@ public sealed class Window : IDisposable
 		Sdl.GL_SetAttribute(Sdl.GLAttr.ContextMinorVersion, 3);
 		Sdl.GL_SetAttribute(Sdl.GLAttr.ContextFlags, Sdl.GLContextFlags.ForwardCompatible);
 		Sdl.GL_SetAttribute(Sdl.GLAttr.ContextProfileMask, Sdl.GLProfile.Core);
+		Sdl.GL_SetAttribute(Sdl.GLAttr.StencilSize, 8);
 
 		// Create window and get ID
 		SdlWindowPtr = Sdl.CreateWindow(title, size.Width, size.Height, Sdl.WindowFlags.Hidden | Sdl.WindowFlags.OpenGL | Sdl.WindowFlags.Resizable);

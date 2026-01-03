@@ -7,7 +7,7 @@ public readonly ref struct TextureRowAccessor(Size size, Span<Color> pixels, int
 	public readonly Size Size = size;
 	private readonly Span<Color> _pixels = pixels;
 
-	public Span<Color> GetRow(int row)
+	public Span<Color> GetRowSpan(int row)
 	{
 		if (row < 0 || row >= Size.Height)
 			throw new ArgumentOutOfRangeException(nameof(row));
@@ -20,7 +20,7 @@ public enum TextureFormat : byte
 {
 	Rgba,
 	Rgb,
-	Red,
+	BitmapFont,
 }
 
 public sealed class Texture : IDisposable

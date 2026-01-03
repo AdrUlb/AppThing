@@ -1,6 +1,5 @@
 using GLCS;
 using GLCS.Managed;
-using System.Buffers;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -156,11 +155,7 @@ internal sealed class BitmapFontRenderer : BatchRenderer, IDisposable
 			texture);
 	}
 
-	internal void HandleSizeChanged(Size size)
-	{
-		var projection = Matrix4x4.CreateOrthographicOffCenter(0, size.Width, size.Height, 0, -100.0f, 100.0f);
-		_uProjection.Matrix4(ref projection);
-	}
+	internal void HandleSizeChanged(Size size) => _uProjection.Matrix4(ref _renderer.Projection);
 
 	internal override void Commit()
 	{

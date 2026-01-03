@@ -5,7 +5,7 @@ using FontThing.TrueType.Parsing;
 
 namespace FontThing.TrueType;
 
-internal static class TrueTypeRasterizer
+public static class TrueTypeRasterizer
 {
 	public static float CalculateStemDarkening(float pixelsPerEm)
 	{
@@ -89,7 +89,7 @@ internal static class TrueTypeRasterizer
 		}
 	}
 
-	private static void RenderGlyph(GlyphOutline glyphOutline, float scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
+	public static void RenderGlyph(GlyphOutline glyphOutline, float scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
 	{
 		var glyphXMin = glyphOutline.XMin * scale;
 		var glyphYMin = glyphOutline.YMin * scale;
@@ -184,6 +184,7 @@ internal static class TrueTypeRasterizer
 			}
 		}
 	}
+
 
 	private static bool IsContourClockwise(List<Vector2> points)
 	{

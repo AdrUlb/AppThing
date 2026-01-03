@@ -65,26 +65,27 @@ public sealed class BitmapFont : IDisposable
 		var glyphX = (int)glyphXPrecise;
 		var glyphY = (int)glyphYPrecise;
 
-		var subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
-		var subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
+		var subX = 0.0f;
+		var subY = 0.0f;
 
 		var round = _pixelSize <= 100.0f;
-
-		/*
-		var subX = float.Round(glyphXPrecise - glyphX, round ? 1 : 0);
-		var subY = float.Round(glyphYPrecise - glyphY, round ? 1 : 0);
-		*/
-
-		if (subX <= -0.0f)
+		if (round)
 		{
-			subX = float.Round(subX + 1, round ? 1 : 0);
-			glyphX--;
-		}
+			subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
+			subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
 
-		if (subY <= -0.0f)
-		{
-			subY = float.Round(subY + 1, round ? 1 : 0);
-			glyphY--;
+			if (subX <= -0.0f)
+			{
+				subX = float.Round(subX + 1, round ? 1 : 0);
+				glyphX--;
+			}
+
+			if (subY <= -0.0f)
+			{
+				subY = float.Round(subY + 1, round ? 1 : 0);
+				glyphY--;
+			}
+
 		}
 
 		penX += glyph.AdvanceWidth;
@@ -104,11 +105,11 @@ public sealed class BitmapFont : IDisposable
 			{
 				for (var y = 0; y < bitmap.Size.Height; y++)
 				{
-					var row = acc.GetRow(y);
+					var row = acc.GetRowSpan(y);
 					for (var x = 0; x < bitmap.Size.Width; x++)
 					{
 						var a = bitmap.Data[x + (acc.Size.Height - y - 1) * acc.Size.Width];
-						row[x] = Color.FromArgb(255, a, a, a);
+						row[x] = Color.FromArgb(a, a, a);
 					}
 				}
 			});
@@ -129,7 +130,14 @@ public sealed class BitmapFont : IDisposable
 
 		// Create new atlas
 		Console.WriteLine($"[BitmapFont] Creating new texture atlas for size {size.Width}x{size.Height}");
-		var newAtlasTexture = new Texture(new(2048, 2048), Color.Transparent, TextureFormat.Red);
+		var atlasSize = (int)(_pixelSize * 16);
+
+		if (atlasSize < 256)
+			atlasSize = 256;
+		else if (atlasSize > 4096)
+			atlasSize = 4096;
+
+		var newAtlasTexture = new Texture(new(atlasSize, atlasSize), Color.Black, TextureFormat.BitmapFont);
 		var newAtlas = new AtlasGenerator(newAtlasTexture);
 		_textureAtlases.Add(newAtlas);
 

@@ -1,3 +1,4 @@
+using FontThing.TrueType.Parsing;
 using GLCS;
 using GLCS.Managed;
 using SDL3CS;
@@ -18,7 +19,10 @@ public sealed class Renderer : IDisposable
 	internal readonly TextureManager TextureManager;
 	private readonly QuadRenderer _quadBatch;
 	private readonly BitmapFontRenderer _bitmapFontBatch;
+	private readonly TestRenderer _testBatch;
 	private readonly int _msaaSamples;
+	
+	internal Matrix4x4 Projection;
 	private bool _disposed;
 	private Size _size;
 	private volatile bool _sizeChanged = false;
@@ -43,10 +47,11 @@ public sealed class Renderer : IDisposable
 
 		MakeCurrent();
 
-		_msaaBuffer = new(supportDepthBuffer: false);
+		_msaaBuffer = new(supportDepthBuffer: true);
 		TextureManager = new();
 		_quadBatch = new(this);
 		_bitmapFontBatch = new(this);
+		_testBatch = new(this);
 
 		Console.WriteLine($"[Renderer] OpenGL Renderer: {Gl.GetString(StringName.Renderer)}");
 		Console.WriteLine($"[Renderer] OpenGL Version: {Gl.GetString(StringName.Version)}");
@@ -74,6 +79,8 @@ public sealed class Renderer : IDisposable
 		_msaaBuffer.Dispose();
 		_quadBatch.Dispose();
 		_bitmapFontBatch.Dispose();
+		_testBatch.Dispose();
+		
 		TextureManager.Dispose();
 		_disposed = true;
 
@@ -112,13 +119,16 @@ public sealed class Renderer : IDisposable
 		if (_sizeChanged)
 		{
 			Gl.Viewport(0, 0, _size.Width, _size.Height);
-			_msaaBuffer.Setup(_size, _msaaSamples);
-			_quadBatch.HandleSizeChanged(_size);
+			Projection = Matrix4x4.CreateOrthographicOffCenter(0, _size.Width, _size.Height, 0, -100.0f, 100.0f);
+			
+			//_msaaBuffer.Setup(_size, _msaaSamples);
+			//_quadBatch.HandleSizeChanged(_size);
 			_bitmapFontBatch.HandleSizeChanged(_size);
+			_testBatch.HandleSizeChanged(_size);
 			_sizeChanged = false;
 		}
 
-		_msaaBuffer.BeginFrame();
+		//_msaaBuffer.BeginFrame();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -131,8 +141,8 @@ public sealed class Renderer : IDisposable
 	internal void EndFrame()
 	{
 		_currentBatch?.Commit();
-		_msaaBuffer.EndFrame();
-		_msaaBuffer.Blit();
+		//_msaaBuffer.EndFrame();
+		//_msaaBuffer.Blit();
 		TextureManager.EndFrame();
 
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
@@ -179,6 +189,8 @@ public sealed class Renderer : IDisposable
 
 		ArrayPool<RendererChar>.Shared.Return(chars);
 	}
+
+	public void Test(TrueTypeFont font) => UseBatch(_testBatch).Test(font);
 
 	internal readonly struct RendererChar(Point dest, BitmapFontGlyph glyph)
 	{
