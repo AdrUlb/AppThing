@@ -9,10 +9,13 @@ namespace AppThing;
 
 public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 {
-	private readonly struct GlyphVertexAttribs(Vector2 position)
+	private readonly struct GlyphVertexAttribs(Vector2 position, Vector4 colorVec)
 	{
 		[GLVertexAttrib(0, 2, VertexAttribPointerType.Float, false)]
 		public readonly Vector2 Position = position;
+
+		[GLVertexAttrib(1, 4, VertexAttribPointerType.Float, false)]
+		public readonly Vector4 Color = colorVec;
 	}
 
 	private readonly struct ScreenVertexAttribs(Vector2 position)
@@ -31,6 +34,7 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		"""
 		#version 330 core
 		layout(location = 0) in vec2 aPos;
+		layout(location = 1) in vec4 aColor;
 
 		out vec4 vColor;
 
@@ -38,6 +42,7 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 
 		void main()
 		{
+			vColor = aColor;
 			gl_Position = uProjection * vec4(aPos, 0.0, 1.0);
 		}
 		""";
@@ -57,7 +62,7 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		}
 		""";
 
-	private const string _fragmentShaderSource =
+	private const string _screenFragmentShader =
 		"""
 		#version 330 core
 		out vec4 FragColor;
@@ -76,14 +81,14 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 	private readonly GLProgram _screenProgram = new();
 	private readonly GLBuffer<GlyphVertexAttribs> _glyphVertexBuffer = new();
 	private readonly GLBuffer<ScreenVertexAttribs> _screenVertexBuffer = new();
-	private readonly GLBuffer<SharedVertexAttribs> _sharedVertexBuffer = new();
 	private readonly GLVertexArray _glyphVao = new();
 	private readonly GLVertexArray _screenVao = new();
 
 	private readonly GLUniformLocation _uProjection;
 
 	private readonly List<GlyphVertexAttribs> _vertices = [];
-	private readonly List<SharedVertexAttribs> _instanceAttribs = [];
+
+	private int _glyphBufferSize = 0;
 
 	public VectorFontRenderer(Renderer renderer)
 	{
@@ -100,9 +105,8 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		_renderer = renderer;
 
 		_glyphVao.VertexAttribPointers(_glyphVertexBuffer);
-		_glyphVao.VertexAttribPointers(_sharedVertexBuffer);
+		_screenVao.VertexAttribPointers(_glyphVertexBuffer);
 		_screenVao.VertexAttribPointers(_screenVertexBuffer);
-		_screenVao.VertexAttribPointers(_sharedVertexBuffer);
 
 		using (var vertexShader = new GLShader(ShaderType.VertexShader))
 		using (var fragmentShader = new GLShader(ShaderType.FragmentShader))
@@ -111,7 +115,7 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 			if (vertexShader.Get(ShaderParameterName.CompileStatus) != GL.TRUE)
 				throw new($"Vertex shader compilation failed: {vertexShader.GetInfoLog()}");
 
-			fragmentShader.Compile(_fragmentShaderSource);
+			fragmentShader.Compile(_screenFragmentShader);
 			if (fragmentShader.Get(ShaderParameterName.CompileStatus) != GL.TRUE)
 				throw new($"Fragment shader compilation failed: {fragmentShader.GetInfoLog()}");
 
@@ -128,7 +132,7 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 			if (vertexShader.Get(ShaderParameterName.CompileStatus) != GL.TRUE)
 				throw new($"Vertex shader compilation failed: {vertexShader.GetInfoLog()}");
 
-			fragmentShader.Compile(_fragmentShaderSource);
+			fragmentShader.Compile(_screenFragmentShader);
 			if (fragmentShader.Get(ShaderParameterName.CompileStatus) != GL.TRUE)
 				throw new($"Fragment shader compilation failed: {fragmentShader.GetInfoLog()}");
 
@@ -148,7 +152,6 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		_glyphVao.Dispose();
 		_glyphVertexBuffer.Dispose();
 		_screenVertexBuffer.Dispose();
-		_sharedVertexBuffer.Dispose();
 	}
 
 	internal void HandleSizeChanged(Size size)
@@ -156,10 +159,17 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		_uProjection.Matrix4(ref _renderer.Projection);
 	}
 
-	internal override void Commit()
+	internal unsafe override void Commit()
 	{
-		_sharedVertexBuffer.Data(CollectionsMarshal.AsSpan(_instanceAttribs), BufferUsageARB.StaticDraw);
-		_glyphVertexBuffer.Data(CollectionsMarshal.AsSpan(_vertices), BufferUsageARB.StaticDraw);
+		if (_glyphBufferSize < _vertices.Count)
+		{
+			Console.WriteLine($"[VectorFontRenderer] Expanding vertex buffer: {_glyphBufferSize} -> {_vertices.Count}");
+			var newGlyphBufferSize = _vertices.Count + (_vertices.Count / 2);
+			_glyphVertexBuffer.Data(newGlyphBufferSize * sizeof(GlyphVertexAttribs), BufferUsageARB.StreamDraw);
+			_glyphBufferSize = newGlyphBufferSize;
+		}
+
+		_glyphVertexBuffer.SubData(0, CollectionsMarshal.AsSpan(_vertices));
 
 		ManagedGL.Current.Unmanaged.Enable(EnableCap.StencilTest);
 		ManagedGL.Current.Unmanaged.Disable(EnableCap.CullFace);
@@ -167,18 +177,20 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		ManagedGL.Current.Unmanaged.Clear(ClearBufferMask.StencilBufferBit);
 
 		ManagedGL.Current.Unmanaged.ColorMask(false, false, false, false);
+		ManagedGL.Current.Unmanaged.DepthMask(false);
 		ManagedGL.Current.Unmanaged.StencilFunc(StencilFunction.Always, 0, 0xFF);
 		ManagedGL.Current.Unmanaged.StencilOpSeparate(TriangleFace.Front, StencilOp.Keep, StencilOp.Keep, StencilOp.IncrWrap);
 		ManagedGL.Current.Unmanaged.StencilOpSeparate(TriangleFace.Back, StencilOp.Keep, StencilOp.Keep, StencilOp.DecrWrap);
 		_glyphVao.DrawArrays(PrimitiveType.Triangles, 0, _vertices.Count, _glyphProgram);
 
 		ManagedGL.Current.Unmanaged.ColorMask(true, true, true, true);
+		ManagedGL.Current.Unmanaged.DepthMask(true);
 		ManagedGL.Current.Unmanaged.StencilFunc(StencilFunction.Notequal, 0, 0xFF);
 		ManagedGL.Current.Unmanaged.StencilOp(StencilOp.Zero, StencilOp.Zero, StencilOp.Zero);
 		_screenVao.DrawArrays(PrimitiveType.TriangleFan, 0, 4, _screenProgram);
+		//_glyphVao.DrawArrays(PrimitiveType.Triangles, 0, _vertices.Count, _glyphProgram);
 
 		_vertices.Clear();
-		_instanceAttribs.Clear();
 
 		ManagedGL.Current.Unmanaged.Disable(EnableCap.StencilTest);
 		ManagedGL.Current.Unmanaged.Enable(EnableCap.CullFace);
@@ -186,70 +198,38 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 
 	internal void DrawText(string str, Point location, VectorFont font, float size, Color color)
 	{
-		var scale = font.Ttf.PointSizeToScale(size);
 		var colorVec = new Vector4(color.R / 255.0f, color.G / 255.0f, color.B / 255.0f, color.A / 255.0f);
 
-		var pen = new Vector2(0, 0);
-
-		var first = true;
+		long penX = 0L;
+		long penY = 0L;
 
 		foreach (var rune in str.EnumerateRunes())
 		{
-			if (rune.Value == '\n')
+			if (font.TryGetGlyph(rune, size, ref penX, ref penY, out var vectorFontGlyph, out var drawPos))
 			{
-				pen.X = 0;
-				pen.Y -= font.Ttf.LineHeight;
-				continue;
-			}
-
-			var glyph = font.Ttf.LoadGlyph(rune);
-
-			if (first)
-				pen.X -= glyph.LeftSideBearing;
-
-			var outline = glyph.Outline;
-
-			if (outline == null)
-			{
-				pen.X += glyph.AdvanceWidth;
-				continue;
-			}
-
-			if (outline is not SimpleGlyphOutline simpleOutline)
-				continue;
-
-			var renderPos = new Vector2(pen.X, font.Ttf.LineHeight - pen.Y) * scale;
-
-			var contours = simpleOutline.GenerateContours(scale, 0.2f);
-			foreach (var contour in contours)
-			{
-				var pivot = (ScalePoint(contour[0]));
-
-				for (var i = 0; i < contour.Count; i++)
+				foreach (var contour in vectorFontGlyph.Contours)
 				{
-					var p0 = (ScalePoint(contour[i]));
-					var p1 = (ScalePoint(contour[(i + 1) % contour.Count]));
-					AddVertex(pivot);
-					AddVertex(p0);
-					AddVertex(p1);
-				}
+					var pivot = ScalePoint(contour[0]);
 
-				continue;
+					for (var i = 0; i < contour.Count; i++)
+					{
+						var p0 = ScalePoint(contour[i]);
+						var p1 = ScalePoint(contour[(i + 1) % contour.Count]);
+						AddVertex(pivot);
+						AddVertex(p0);
+						AddVertex(p1);
+					}
 
-				void AddVertex(Vector2 point)
-				{
-					point += renderPos;
-					point += new Vector2(location.X, location.Y);
+					continue;
 
-					_vertices.Add(new(point));
-					var attribs = new SharedVertexAttribs(colorVec);
-					_instanceAttribs.Add(attribs);
+					void AddVertex(Vector2 point)
+					{
+						point += drawPos;
+						point += new Vector2(location.X, location.Y);
+						_vertices.Add(new(point, colorVec));
+					}
 				}
 			}
-
-			pen.X += glyph.AdvanceWidth;
-
-			first = false;
 		}
 
 		return;

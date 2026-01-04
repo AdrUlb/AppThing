@@ -7,8 +7,8 @@ namespace AppThing;
 
 public sealed class Window : IDisposable
 {
-	public delegate void UpdateEventHandler(float delta);
-	public delegate void DrawEventHandler(Renderer renderer, float delta);
+	public delegate void UpdateEventHandler(double delta);
+	public delegate void DrawEventHandler(Renderer renderer, double delta);
 	public delegate void CloseRequestedEventHandler(Window window);
 
 	public string Title
@@ -107,7 +107,7 @@ public sealed class Window : IDisposable
 		while (_keepRenderThreadAlive)
 		{
 			var thisTime = Stopwatch.GetTimestamp();
-			var deltaTime = (thisTime - _lastDraw) * 1000.0f / Stopwatch.Frequency;
+			var deltaTime = (thisTime - _lastDraw) / (double)Stopwatch.Frequency;
 
 			Renderer.BeginFrame();
 			
@@ -131,7 +131,7 @@ public sealed class Window : IDisposable
 	internal void HandleUpdate()
 	{
 		var thisTime = Stopwatch.GetTimestamp();
-		var deltaTime = (thisTime - _lastUpdate) * 1000.0f / Stopwatch.Frequency;
+		var deltaTime = (thisTime - _lastUpdate) / (double)Stopwatch.Frequency;
 
 		Update?.Invoke(deltaTime);
 

@@ -1,4 +1,3 @@
-using FontThing.TrueType.Parsing;
 using GLCS;
 using GLCS.Managed;
 using SDL3CS;
@@ -65,7 +64,7 @@ public sealed class Renderer : IDisposable
 		Gl.Unmanaged.FrontFace(FrontFaceDirection.Cw);
 		Gl.Unmanaged.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
-		_msaaSamples = Math.Min(16, Gl.GetInteger(GetPName.MaxFramebufferSamples));
+		_msaaSamples = Math.Min(4, Gl.GetInteger(GetPName.MaxFramebufferSamples));
 		DoneCurrent();
 	}
 
@@ -190,6 +189,7 @@ public sealed class Renderer : IDisposable
 		ArrayPool<RendererChar>.Shared.Return(chars);
 	}
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void DrawText(string str, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(str, location, font, size, color);
 
 	internal readonly struct RendererChar(Point dest, BitmapFontGlyph glyph)

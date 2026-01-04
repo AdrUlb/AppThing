@@ -49,74 +49,70 @@ public sealed class BitmapFont : IDisposable
 		if (penX == 0.0f)
 			penX -= glyph.LeftSideBearing;
 
-		if (glyph.Outline == null)
-		{
-			penX += glyph.AdvanceWidth;
+        if (glyph.Outline != null)
+        {
+            var glyphXPrecise = (penX + glyph.Outline.XMin) * _scale;
+            var glyphYPrecise = (penY + glyph.Outline.YMin - _ttf.LineHeight) * _scale;
 
-			bitmapFontGlyph = default;
-			drawPos = Point.Empty;
-			return false;
-		}
+            var glyphX = (int)glyphXPrecise;
+            var glyphY = (int)glyphYPrecise;
 
-		var glyphXPrecise = (penX + glyph.Outline.XMin) * _scale;
-		var glyphYPrecise = (penY + glyph.Outline.YMin - _ttf.LineHeight) * _scale;
+            var subX = 0.0f;
+            var subY = 0.0f;
 
-		var glyphX = (int)glyphXPrecise;
-		var glyphY = (int)glyphYPrecise;
+            var round = _pixelSize <= 100.0f;
+            if (round)
+            {
+                subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
+                subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
 
-		var subX = 0.0f;
-		var subY = 0.0f;
+                if (subX <= -0.0f)
+                {
+                    subX = float.Round(subX + 1, round ? 1 : 0);
+                    glyphX--;
+                }
 
-		var round = _pixelSize <= 100.0f;
-		if (round)
-		{
-			subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
-			subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
+                if (subY <= -0.0f)
+                {
+                    subY = float.Round(subY + 1, round ? 1 : 0);
+                    glyphY--;
+                }
+            }
 
-			if (subX <= -0.0f)
-			{
-				subX = float.Round(subX + 1, round ? 1 : 0);
-				glyphX--;
-			}
+            if (!_glyphs.TryGetValue((glyph, subX, subY), out bitmapFontGlyph))
+            {
+                var bitmap = glyph.Outline.Render(Size, subpixelOffsetX: subX, subpixelOffsetY: subY);
 
-			if (subY <= -0.0f)
-			{
-				subY = float.Round(subY + 1, round ? 1 : 0);
-				glyphY--;
-			}
+                var texture = TryAllocateRegion(bitmap.Size, out var region);
 
-		}
+                texture.AccessPixels(region,
+                    acc =>
+                    {
+                        for (var y = 0; y < bitmap.Size.Height; y++)
+                        {
+                            var row = acc.GetRowSpan(y);
+                            for (var x = 0; x < bitmap.Size.Width; x++)
+                            {
+                                var a = bitmap.Data[x + (acc.Size.Height - y - 1) * acc.Size.Width];
+                                row[x] = Color.FromArgb(a, a, a);
+                            }
+                        }
+                    });
 
-		penX += glyph.AdvanceWidth;
+                bitmapFontGlyph = new(texture, region);
+                _glyphs.Add((glyph, subX, subY), bitmapFontGlyph);
+            }
 
-		if (_glyphs.TryGetValue((glyph, subX, subY), out bitmapFontGlyph))
-		{
-			drawPos = new(glyphX, -glyphY - bitmapFontGlyph.AtlasRegion.Size.Height);
-			return true;
-		}
+            drawPos = new(glyphX, -glyphY - bitmapFontGlyph.AtlasRegion.Size.Height);
+        }
+        else
+        {
+            bitmapFontGlyph = default;
+            drawPos = Point.Empty;
+        }
 
-		var bitmap = glyph.Outline.Render(Size, subpixelOffsetX: subX, subpixelOffsetY: subY);
-
-		var texture = TryAllocateRegion(bitmap.Size, out var region);
-
-		texture.AccessPixels(region,
-			acc =>
-			{
-				for (var y = 0; y < bitmap.Size.Height; y++)
-				{
-					var row = acc.GetRowSpan(y);
-					for (var x = 0; x < bitmap.Size.Width; x++)
-					{
-						var a = bitmap.Data[x + (acc.Size.Height - y - 1) * acc.Size.Width];
-						row[x] = Color.FromArgb(a, a, a);
-					}
-				}
-			});
-
-		bitmapFontGlyph = new(texture, region);
-		_glyphs.Add((glyph, subX, subY), bitmapFontGlyph);
-		drawPos = new(glyphX, -glyphY - bitmapFontGlyph.AtlasRegion.Size.Height);
-		return true;
+        penX += glyph.AdvanceWidth;
+		return glyph.Outline != null;
 	}
 
 	private Texture TryAllocateRegion(Size size, out Rectangle rect)
