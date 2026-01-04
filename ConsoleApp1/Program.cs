@@ -11,11 +11,11 @@ internal static class Program
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		const string fontFile = @"C:\Windows\Fonts\calibri.ttf";
+		const string fontFile = @"/usr/share/fonts/TTF/calibri.ttf";
 		var fontSize = 40.0f;
 
-		//var font = BitmapFont.FromFile(fontFile, fontSize);
-		var font = VectorFont.FromFile(fontFile);
+		var font = BitmapFont.FromFile(fontFile, fontSize);
+		//var font = VectorFont.FromFile(fontFile);
 
 		var textColor = Color.FromArgb(147, 161, 161);
 
@@ -42,10 +42,10 @@ internal static class Program
 			//var str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ\nabcdefghijklmnopqrstuvwxyz\n0123456789\n!@#$%^&*()_+-=[]{}|;':\",.<>/?`~";
 			//renderer.DrawText("Hello, World!\nTest", new(0, 0), font, textColor);
 
-			//renderer.DrawText(str, new(10, 0), font, textColor);
-			renderer.DrawText(str, new(10, 0), font, fontSize, textColor);
+			renderer.DrawText(str, new(10, 0), font, textColor);
+			//renderer.DrawText(str, new(10, 0), font, fontSize, textColor);
 
-			fontSize += (float)delta * 20f;
+			//fontSize += (float)delta * 20f;
 			Console.WriteLine(fpsString + ", Font Size: " + fontSize);
 		};
 
