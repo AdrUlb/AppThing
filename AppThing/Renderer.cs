@@ -124,7 +124,7 @@ public sealed class Renderer : IDisposable
 			_sizeChanged = false;
 		}
 
-		//_msaaBuffer.BeginFrame();
+		_msaaBuffer.BeginFrame();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -137,8 +137,8 @@ public sealed class Renderer : IDisposable
 	internal void EndFrame()
 	{
 		_currentBatch?.Commit();
-		//_msaaBuffer.EndFrame();
-		//_msaaBuffer.Blit();
+		_msaaBuffer.EndFrame();
+		_msaaBuffer.Blit();
 		TextureManager.EndFrame();
 
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
@@ -171,15 +171,24 @@ public sealed class Renderer : IDisposable
 		var penX = 0L;
 		var penY = 0L;
 
-		foreach (var c in str)
+		foreach (var c in str.EnumerateRunes())
 		{
-			if (font.TryGetGlyph(new(c), ref penX, ref penY, out var fontGlyph, out var drawPos))
-				_charBuffer.Add(new(drawPos, fontGlyph));
+			if (!font.TryGetGlyph(c, ref penX, ref penY, out var fontGlyph, out var drawPos))
+				continue;
+
+			if (drawPos.Y >= _size.Height)
+				break;
+
+			if (drawPos.X >= _size.Width)
+				continue;
+
+			_charBuffer.Add(new(drawPos, fontGlyph));
 		}
 
-		for (var i = 0; i < _charBuffer.Count; i++)
+		var span = CollectionsMarshal.AsSpan(_charBuffer);
+		for (var i = 0; i < span.Length; i++)
 		{
-			ref var charInfo = ref CollectionsMarshal.AsSpan(_charBuffer)[i];
+			ref var charInfo = ref span[i];
 			UseBatch(_quadBatch).Draw(charInfo.GlyphTexture.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.GlyphTexture.AtlasRegion.Size), charInfo.GlyphTexture.AtlasRegion, color, Matrix4x4.Identity);
 		}
 	}

@@ -11,7 +11,7 @@ public static class TrueTypeRasterizer
 	{
 		const float minPpem = 10.0f;
 		const float maxPpem = 36.0f;
-		const float maxDarkening = 0.25f;
+		const float maxDarkening = 0.10f;
 
 		if (pixelsPerEm <= minPpem)
 			return maxDarkening;
