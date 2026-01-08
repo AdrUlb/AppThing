@@ -11,7 +11,7 @@ internal static class Program
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		const string fontFile = @"/usr/share/fonts/TTF/calibri.ttf";
+		const string fontFile = @"/usr/share/fonts/TTF/times.ttf";
 		var fontSize = 40.0f;
 
 		var font = BitmapFont.FromFile(fontFile, fontSize);

@@ -51,33 +51,49 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 	}
 }
 
-public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax, ushort[] endPointsOfContours, byte[] instructions, GlyphPoint[] points) : GlyphOutline(font, xMin, yMin, xMax, yMax)
+public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax, ushort[] endPointsOfContours, byte[] instructions, GlyphOutlinePoint[] points) : GlyphOutline(font, xMin, yMin, xMax, yMax)
 {
 	public readonly ushort[] EndPointsOfContours = endPointsOfContours;
 	public readonly byte[] Instructions = instructions;
-	public readonly GlyphPoint[] Points = points;
+	public readonly GlyphOutlinePoint[] Points = points;
+	public int NumberOfContours => EndPointsOfContours.Length;
 
 	public override IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance)
 	{
-		var contours = new List<Vector2>[EndPointsOfContours.Length];
+		var contours = new List<Vector2>[NumberOfContours];
 
-		var contourStartpointIndex = 0;
-		for (var contourIndex = 0; contourIndex < EndPointsOfContours.Length; contourIndex++)
+		for (var i = 0; i < NumberOfContours; i++)
 		{
-			var contourEndpointIndex = EndPointsOfContours[contourIndex];
+			var lines = new List<Vector2>();
 
-			contours[contourIndex] = GenerateContour(Points.AsSpan()[contourStartpointIndex..(contourEndpointIndex + 1)], scale, bezierTolerance);
+			ProcessContour(i,
+				(p0, p1) =>
+				{
+					lines.Add(new Vector2(p1.X, p1.Y) * scale);
+				},
+				(p0, p1, p2) =>
+				{
+					var result = BezierSubdivider.RecursiveBezier(
+						new(p0.X, p0.Y),
+						new(p1.X, p1.Y),
+						new(p2.X, p2.Y),
+						bezierTolerance
+					);
 
-			// Next contour's start point index immediately follows this contour's endpoint index
-			contourStartpointIndex = contourEndpointIndex + 1;
+					lines.AddRange(result.Skip(1).Select(p => p * scale));
+				}
+			);
+
+			contours[i] = lines;
 		}
 
 		return contours;
 	}
 
-	private static List<Vector2> GenerateContour(ReadOnlySpan<GlyphPoint> points, float scale, float bezierTolerance)
+	public void ProcessContour(int contourIndex, Action<Point, Point> lineCallback, Action<Point, Point, Point> bezierCallback)
 	{
-		var lines = new List<Vector2>();
+		var contourStartpointIndex = contourIndex == 0 ? 0 : EndPointsOfContours[contourIndex - 1] + 1;
+		var points = Points.AsSpan()[contourStartpointIndex..(EndPointsOfContours[contourIndex] + 1)];
 
 		// Find first on-curve point
 		var startOffset = 0; // Index of first point to actually read in the loop
@@ -88,49 +104,47 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 
 		for (var i = 0; i < points.Length; i++)
 		{
-			var index = (i + startOffset) % points.Length;
+			var pointsIndex = (i + startOffset) % points.Length;
 
-			var p1 = points[index];
+			var p1 = points[pointsIndex];
 			var p1Vec = ScalePoint(p1);
 
 			// Two consecutive on-curve points - straight line
 			if (p1.OnCurve)
 			{
-				lines.Add(p1Vec);
+				lineCallback(p0Vec, p1Vec);
 				p0Vec = p1Vec;
 				continue;
 			}
 
-			index = (index + 1) % points.Length;
+			pointsIndex = (pointsIndex + 1) % points.Length;
 
-			var p2 = points[index];
+			var p2 = points[pointsIndex];
 			var p2Vec = ScalePoint(p2);
 
 			if (p2.OnCurve) // Points are: on-curve, off-curve, on-curve - quadratic Bézier
 			{
 				i++;
 
-				AddBezier(p0Vec, p1Vec, p2Vec);
+				bezierCallback(p0Vec, p1Vec, p2Vec);
 				p0Vec = p2Vec;
 			}
 			else // Points are: on-curve, off-curve, off-curve - insert midpoint as on-curve point for quadratic Bézier
 			{
-				var midpoint = Vector2.Lerp(p1Vec, p2Vec, 0.5f);
-				AddBezier(p0Vec, p1Vec, midpoint);
+				//var midpoint = Vector2.Lerp(p1Vec, p2Vec, 0.5f);
+				var midpoint = new Point(
+					(short)((p1Vec.X + p2Vec.X) / 2),
+					(short)((p1Vec.Y + p2Vec.Y) / 2)
+				);
+
+				bezierCallback(p0Vec, p1Vec, midpoint);
 				p0Vec = midpoint;
 			}
 		}
 
-		// Next contour's start point index immediately follows this contour's endpoint index
-		return lines;
+		return;
 
-		Vector2 ScalePoint(GlyphPoint point) => new Vector2(point.X, point.Y) * scale;
-
-		void AddBezier(Vector2 p0, Vector2 p1, Vector2 p2)
-		{
-			var result = BezierSubdivider.RecursiveBezier(p0, p1, p2, bezierTolerance);
-			lines.AddRange(CollectionsMarshal.AsSpan(result)[1..]);
-		}
+		Point ScalePoint(GlyphOutlinePoint outlinePoint) => new(outlinePoint.X, outlinePoint.Y);
 	}
 }
 

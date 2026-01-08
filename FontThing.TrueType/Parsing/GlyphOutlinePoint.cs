@@ -1,6 +1,6 @@
 namespace FontThing.TrueType.Parsing;
 
-public struct GlyphPoint
+public struct GlyphOutlinePoint
 {
 	public short X;
 	public short Y;

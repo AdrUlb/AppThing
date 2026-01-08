@@ -3,6 +3,7 @@ using GLCS;
 using GLCS.Managed;
 using System.Drawing;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace AppThing;
@@ -187,8 +188,8 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 		ManagedGL.Current.Unmanaged.DepthMask(true);
 		ManagedGL.Current.Unmanaged.StencilFunc(StencilFunction.Notequal, 0, 0xFF);
 		ManagedGL.Current.Unmanaged.StencilOp(StencilOp.Zero, StencilOp.Zero, StencilOp.Zero);
-		_screenVao.DrawArrays(PrimitiveType.TriangleFan, 0, 4, _screenProgram);
-		//_glyphVao.DrawArrays(PrimitiveType.Triangles, 0, _vertices.Count, _glyphProgram);
+		//_screenVao.DrawArrays(PrimitiveType.TriangleFan, 0, 4, _screenProgram);
+		_glyphVao.DrawArrays(PrimitiveType.Triangles, 0, _vertices.Count, _glyphProgram);
 
 		_vertices.Clear();
 
@@ -200,44 +201,37 @@ public sealed class VectorFontRenderer : BatchRenderer, IDisposable
 	{
 		var colorVec = new Vector4(color.R / 255.0f, color.G / 255.0f, color.B / 255.0f, color.A / 255.0f);
 
-		long penX = 0L;
-		long penY = 0L;
+		var penX = 0L;
+		var penY = 0L;
 
 		foreach (var rune in str.EnumerateRunes())
 		{
-			if (font.TryGetGlyph(rune, size, ref penX, ref penY, out var vectorFontGlyph, out var drawPos))
+			if (!font.TryGetGlyph(rune, size, ref penX, ref penY, out var vectorFontGlyph, out var drawPos))
+				continue;
+
+			foreach (var contour in vectorFontGlyph.Contours)
 			{
-				foreach (var contour in vectorFontGlyph.Contours)
+				var pivot = new Vector2(0, 0);
+
+				for (var i = 0; i < contour.Count; i++)
 				{
-					var pivot = ScalePoint(contour[0]);
+					var p0 = contour[i];
+					var p1 = contour[(i + 1) % contour.Count];
+					AddVertex(pivot);
+					AddVertex(p0);
+					AddVertex(p1);
+				}
 
-					for (var i = 0; i < contour.Count; i++)
-					{
-						var p0 = ScalePoint(contour[i]);
-						var p1 = ScalePoint(contour[(i + 1) % contour.Count]);
-						AddVertex(pivot);
-						AddVertex(p0);
-						AddVertex(p1);
-					}
+				continue;
 
-					continue;
-
-					void AddVertex(Vector2 point)
-					{
-						point += drawPos;
-						point += new Vector2(location.X, location.Y);
-						_vertices.Add(new(point, colorVec));
-					}
+				[MethodImpl(MethodImplOptions.AggressiveInlining)]
+				void AddVertex(Vector2 point)
+				{
+					point += drawPos;
+					point += new Vector2(location.X, location.Y);
+					_vertices.Add(new(point, colorVec));
 				}
 			}
-		}
-
-		return;
-
-		Vector2 ScalePoint(Vector2 point)
-		{
-			point *= new Vector2(1, -1);
-			return point;
 		}
 	}
 }

@@ -127,7 +127,7 @@ public sealed class Renderer : IDisposable
 			_sizeChanged = false;
 		}
 
-		_msaaBuffer.BeginFrame();
+		//_msaaBuffer.BeginFrame();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -140,8 +140,8 @@ public sealed class Renderer : IDisposable
 	internal void EndFrame()
 	{
 		_currentBatch?.Commit();
-		_msaaBuffer.EndFrame();
-		_msaaBuffer.Blit();
+		//_msaaBuffer.EndFrame();
+		//_msaaBuffer.Blit();
 		TextureManager.EndFrame();
 
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
@@ -165,29 +165,8 @@ public sealed class Renderer : IDisposable
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
 
-	public void DrawText(string str, Point location, BitmapFont font, Color color)
-	{
-		var chars = ArrayPool<RendererChar>.Shared.Rent(str.Length);
-		var charCount = 0;
-
-		var penX = 0L;
-		var penY = 0L;
-
-		foreach (var c in str)
-		{
-			if (font.TryGetGlyph(new(c), ref penX, ref penY, out var fontGlyph, out var drawPos))
-				chars[charCount++] = new(drawPos, fontGlyph);
-		}
-
-		UseBatch(_bitmapFontBatch);
-		for (var i = 0; i < charCount; i++)
-		{
-			var charInfo = chars[i];
-			_bitmapFontBatch.DrawGlyph(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
-		}
-
-		ArrayPool<RendererChar>.Shared.Return(chars);
-	}
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void DrawText(string str, Point location, BitmapFont font, Color color) => UseBatch(_bitmapFontBatch).DrawText(str, location, font, color);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void DrawText(string str, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(str, location, font, size, color);

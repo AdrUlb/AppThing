@@ -1,5 +1,6 @@
 using GLCS;
 using GLCS.Managed;
+using System.Buffers;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -153,6 +154,29 @@ internal sealed class BitmapFontRenderer : BatchRenderer, IDisposable
 		AddQuad(
 			new(colorVec, model, uvTransform),
 			texture);
+	}
+	
+	public void DrawText(string str, Point location, BitmapFont font, Color color)
+	{
+		var chars = ArrayPool<Renderer.RendererChar>.Shared.Rent(str.Length);
+		var charCount = 0;
+
+		var penX = 0L;
+		var penY = 0L;
+
+		foreach (var c in str)
+		{
+			if (font.TryGetGlyph(new(c), ref penX, ref penY, out var fontGlyph, out var drawPos))
+				chars[charCount++] = new(drawPos, fontGlyph);
+		}
+
+		for (var i = 0; i < charCount; i++)
+		{
+			var charInfo = chars[i];
+			DrawGlyph(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
+		}
+
+		ArrayPool<Renderer.RendererChar>.Shared.Return(chars);
 	}
 
 	internal void HandleSizeChanged(Size size) => _uProjection.Matrix4(ref _renderer.Projection);

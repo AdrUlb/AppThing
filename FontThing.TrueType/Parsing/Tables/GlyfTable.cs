@@ -76,7 +76,7 @@ internal sealed class GlyfTable
 
 				var pointCount = endPointsOfContours[^1] + 1;
 
-				var points = new GlyphPoint[pointCount];
+				var points = new GlyphOutlinePoint[pointCount];
 
 				simpleOutlineFlags.Clear();
 

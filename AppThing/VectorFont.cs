@@ -51,7 +51,13 @@ public sealed class VectorFont
 			if (!_glyphCache.TryGetValue((character, scale), out vectorFontGlyph))
 			{
 				var contours = glyph.Outline.GenerateContours(scale, 0.1f);
-				vectorFontGlyph = new VectorFontGlyph(contours);
+				foreach (var contour in contours)
+				{
+					for (var i = 0; i < contour.Count; i++)
+						contour[i] = new(contour[i].X, -contour[i].Y);
+				}
+
+				vectorFontGlyph = new(contours);
 				_glyphCache.Add((character, scale), vectorFontGlyph);
 			}
 		}
