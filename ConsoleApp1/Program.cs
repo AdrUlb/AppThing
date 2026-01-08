@@ -11,8 +11,8 @@ internal static class Program
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		const string fontFile = @"/usr/share/fonts/TTF/comic.ttf";
-		var fontSize = 120.0f;
+		const string fontFile = @"/usr/share/fonts/TTF/segoeui.ttf";
+		var fontSize = 11.0f;
 
 		var font = BitmapFont.FromFile(fontFile, fontSize);
 		//var font = VectorFont.FromFile(fontFile);
@@ -28,7 +28,7 @@ internal static class Program
 		var str = $"\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
 
 		for (var i = 0; i < 100; i++)
-			str += "\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent pharetra, magna quis convallis feugiat, nisl est condimentum ipsum, sit amet accumsan velit lectus ut orci. Aenean cursus mattis elementum. Mauris gravida orci vel tempor feugiat. In non congue elit. Pellentesque eu lacus libero. Mauris auctor tellus laoreet ipsum congue, ac egestas est convallis. Curabitur sit amet viverra eros. Vivamus tempus massa eu quam imperdiet, eget mollis leo auctor. Vivamus rutrum ultrices risus id facilisis. Curabitur et purus accumsan, sodales odio vel, varius diam. Ut scelerisque augue ut lacus sollicitudin elementum. Vivamus at semper orci..";
+			str += "\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent pharetra, magna quis convallis feugiat, nisl est condimentum ipsum, sit amet accumsan velit lectus ut orci. Aenean cursus mattis elementum. Mauris gravida orci vel tempor feugiat. In non congue elit.";
 
 		window.Draw += (renderer, delta) =>
 		{
@@ -42,10 +42,11 @@ internal static class Program
 				frameCount = 0;
 			}
 
-			renderer.DrawText(fpsString, new(10, 0), font, textColor);
-			
-			renderer.DrawText(str, new(10, 0), font, textColor);
+			//renderer.DrawText(fpsString, new(10, 0), font, fontSize, textColor);
 			//renderer.DrawText(str, new(10, 0), font, fontSize, textColor);
+			
+			renderer.DrawText(fpsString, new(10, 0), font, textColor);
+			renderer.DrawText(str, new(10, 0), font, textColor);
 
 			//fontSize += (float)delta * 20f;
 			//Console.WriteLine(fpsString + ", Font Size: " + fontSize);

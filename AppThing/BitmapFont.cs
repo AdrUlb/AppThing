@@ -16,7 +16,7 @@ public sealed class BitmapFont : IDisposable
 	public float Size { get; }
 
 	public float LineHeight => _ttf.LineHeight * _scale;
-	
+
 	private readonly float _pixelSize;
 	private readonly float _scale;
 
@@ -43,7 +43,7 @@ public sealed class BitmapFont : IDisposable
 		{
 			penX = 0;
 			penY -= _ttf.LineHeight;
-
+			
 			glyphTexture = default;
 			drawPos = Point.Empty;
 			return false;
@@ -82,19 +82,21 @@ public sealed class BitmapFont : IDisposable
 				roundingDivisor = 4.0f;
 			else if (_pixelSize <= 25.0f)
 				roundingDivisor = 8.0f;
-			
+			else if (_pixelSize <= 12.5f)
+				roundingDivisor = 16.0f;
+
 			subX = (int)((glyphXPrecise - glyphX) * roundingDivisor) / roundingDivisor;
 			subY = (int)((glyphYPrecise - glyphY) * roundingDivisor) / roundingDivisor;
 
-			if (subX <= -0.0f)
+			if (subX <= 0.0f)
 			{
-				subX = float.Round(subX + 1, round ? 1 : 0);
+				subX++;
 				glyphX--;
 			}
 
-			if (subY <= -0.0f)
+			if (subY <= 0.0f)
 			{
-				subY = float.Round(subY + 1, round ? 1 : 0);
+				subY++;
 				glyphY--;
 			}
 		}

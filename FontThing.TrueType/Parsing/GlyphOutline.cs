@@ -12,7 +12,7 @@ public enum GlyphOutlineRenderOptions
 	None = 0,
 	StemDarkening = 1 << 0,
 	Gamma = 1 << 1,
-	Default = Gamma,
+	Default = StemDarkening,
 }
 
 public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax)
