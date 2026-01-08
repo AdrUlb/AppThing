@@ -4,14 +4,14 @@ using System.Text;
 
 namespace AppThing;
 
-public readonly struct BitmapFontGlyph(Texture atlas, Rectangle atlasRegion)
-{
-	public readonly Texture Atlas = atlas;
-	public readonly Rectangle AtlasRegion = atlasRegion;
-}
-
 public sealed class BitmapFont : IDisposable
 {
+	public readonly struct GlyphTexture(Texture atlas, Rectangle atlasRegion)
+	{
+		public readonly Texture Atlas = atlas;
+		public readonly Rectangle AtlasRegion = atlasRegion;
+	}
+
 	public float Size { get; }
 
 	private readonly float _pixelSize;
@@ -19,9 +19,10 @@ public sealed class BitmapFont : IDisposable
 
 	private readonly TrueTypeFont _ttf;
 
-	public readonly List<AtlasGenerator> _textureAtlases = [];
+	private readonly List<AtlasGenerator> _textureAtlases = [];
 
-	private readonly Dictionary<(Glyph, float subX, float subY), BitmapFontGlyph> _glyphs = [];
+	private readonly Dictionary<Rune, Glyph> _loadedGlyphs = [];
+	private readonly Dictionary<(Glyph, float subX, float subY), GlyphTexture> _glyphs = [];
 
 	private BitmapFont(TrueTypeFont ttf, float size)
 	{
@@ -32,86 +33,90 @@ public sealed class BitmapFont : IDisposable
 		_scale = ttf.PointSizeToScale(size);
 	}
 
-	public bool TryGetGlyph(Rune character, ref long penX, ref long penY, out BitmapFontGlyph bitmapFontGlyph, out Point drawPos)
+	public bool TryGetGlyph(Rune character, ref long penX, ref long penY, out GlyphTexture glyphTexture, out Point drawPos)
 	{
 		if (character.Value == '\n')
 		{
 			penX = 0;
 			penY -= _ttf.LineHeight;
 
-			bitmapFontGlyph = default;
+			glyphTexture = default;
 			drawPos = Point.Empty;
 			return false;
 		}
 
-		var glyph = _ttf.LoadGlyph(character);
+		if (!_loadedGlyphs.TryGetValue(character, out var glyph))
+		{
+			glyph = _ttf.LoadGlyph(character);
+			_loadedGlyphs.Add(character, glyph);
+		}
 
 		if (penX == 0.0f)
 			penX -= glyph.LeftSideBearing;
 
-        if (glyph.Outline != null)
-        {
-            var glyphXPrecise = (penX + glyph.Outline.XMin) * _scale;
-            var glyphYPrecise = (penY + glyph.Outline.YMin - _ttf.LineHeight) * _scale;
+		if (glyph.Outline != null)
+		{
+			var glyphXPrecise = (penX + glyph.Outline.XMin) * _scale;
+			var glyphYPrecise = (penY + glyph.Outline.YMin - _ttf.LineHeight) * _scale;
 
-            var glyphX = (int)glyphXPrecise;
-            var glyphY = (int)glyphYPrecise;
+			var glyphX = (int)glyphXPrecise;
+			var glyphY = (int)glyphYPrecise;
 
-            var subX = 0.0f;
-            var subY = 0.0f;
+			var subX = 0.0f;
+			var subY = 0.0f;
 
-            var round = _pixelSize <= 100.0f;
-            if (round)
-            {
-                subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
-                subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
+			var round = _pixelSize <= 100.0f;
+			if (round)
+			{
+				subX = (int)((glyphXPrecise - glyphX) * 5.0f) / 5.0f;
+				subY = (int)((glyphYPrecise - glyphY) * 5.0f) / 5.0f;
 
-                if (subX <= -0.0f)
-                {
-                    subX = float.Round(subX + 1, round ? 1 : 0);
-                    glyphX--;
-                }
+				if (subX <= -0.0f)
+				{
+					subX = float.Round(subX + 1, round ? 1 : 0);
+					glyphX--;
+				}
 
-                if (subY <= -0.0f)
-                {
-                    subY = float.Round(subY + 1, round ? 1 : 0);
-                    glyphY--;
-                }
-            }
+				if (subY <= -0.0f)
+				{
+					subY = float.Round(subY + 1, round ? 1 : 0);
+					glyphY--;
+				}
+			}
 
-            if (!_glyphs.TryGetValue((glyph, subX, subY), out bitmapFontGlyph))
-            {
-                var bitmap = glyph.Outline.Render(Size, subpixelOffsetX: subX, subpixelOffsetY: subY);
+			if (!_glyphs.TryGetValue((glyph, subX, subY), out glyphTexture))
+			{
+				var bitmap = glyph.Outline.Render(Size, subpixelOffsetX: subX, subpixelOffsetY: subY);
 
-                var texture = TryAllocateRegion(bitmap.Size, out var region);
+				var texture = TryAllocateRegion(bitmap.Size, out var region);
 
-                texture.AccessPixels(region,
-                    acc =>
-                    {
-                        for (var y = 0; y < bitmap.Size.Height; y++)
-                        {
-                            var row = acc.GetRowSpan(y);
-                            for (var x = 0; x < bitmap.Size.Width; x++)
-                            {
-                                var a = bitmap.Data[x + (acc.Size.Height - y - 1) * acc.Size.Width];
-                                row[x] = Color.FromArgb(a, a, a);
-                            }
-                        }
-                    });
+				texture.AccessPixels(region,
+					acc =>
+					{
+						for (var y = 0; y < bitmap.Size.Height; y++)
+						{
+							var row = acc.GetRowSpan(y);
+							for (var x = 0; x < bitmap.Size.Width; x++)
+							{
+								var a = bitmap.Data[x + (acc.Size.Height - y - 1) * acc.Size.Width];
+								row[x] = Color.FromArgb(a, a, a);
+							}
+						}
+					});
 
-                bitmapFontGlyph = new(texture, region);
-                _glyphs.Add((glyph, subX, subY), bitmapFontGlyph);
-            }
+				glyphTexture = new(texture, region);
+				_glyphs.Add((glyph, subX, subY), glyphTexture);
+			}
 
-            drawPos = new(glyphX, -glyphY - bitmapFontGlyph.AtlasRegion.Size.Height);
-        }
-        else
-        {
-            bitmapFontGlyph = default;
-            drawPos = Point.Empty;
-        }
+			drawPos = new(glyphX, -glyphY - glyphTexture.AtlasRegion.Size.Height);
+		}
+		else
+		{
+			glyphTexture = default;
+			drawPos = Point.Empty;
+		}
 
-        penX += glyph.AdvanceWidth;
+		penX += glyph.AdvanceWidth;
 		return glyph.Outline != null;
 	}
 

@@ -39,8 +39,13 @@ internal sealed class TextureManager : IDisposable
 					HandleChanged(texture, changedRegion);
 					lock (_changedTexturesLock)
 						_changedTextures.Remove(texture);
+
+					goto end;
 				}
 			}
+
+			if (CurrentTexture == texture)
+				return;
 
 			goto end;
 		}
@@ -87,8 +92,8 @@ internal sealed class TextureManager : IDisposable
 				glTexture.SetParameter(TextureParameterName.TextureSwizzleRgba, [(int)GL.RED, (int)GL.GREEN, (int)GL.BLUE, (int)GL.ALPHA]);
 				break;
 		}
-			
-		
+
+
 		glTexture.Bind();
 		CurrentTexture = texture;
 	}

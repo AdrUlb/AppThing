@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Drawing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace AppThing;
 
@@ -161,10 +162,11 @@ public sealed class Renderer : IDisposable
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
 
+	private readonly List<RendererChar> _charBuffer = [];
+
 	public void DrawText(string str, Point location, BitmapFont font, Color color)
 	{
-		var chars = ArrayPool<Renderer.RendererChar>.Shared.Rent(str.Length);
-		var charCount = 0;
+		_charBuffer.Clear();
 
 		var penX = 0L;
 		var penY = 0L;
@@ -172,25 +174,23 @@ public sealed class Renderer : IDisposable
 		foreach (var c in str)
 		{
 			if (font.TryGetGlyph(new(c), ref penX, ref penY, out var fontGlyph, out var drawPos))
-				chars[charCount++] = new(drawPos, fontGlyph);
+				_charBuffer.Add(new(drawPos, fontGlyph));
 		}
 
-		for (var i = 0; i < charCount; i++)
+		for (var i = 0; i < _charBuffer.Count; i++)
 		{
-			var charInfo = chars[i];
-			UseBatch(_quadBatch).Draw(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
+			ref var charInfo = ref CollectionsMarshal.AsSpan(_charBuffer)[i];
+			UseBatch(_quadBatch).Draw(charInfo.GlyphTexture.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.GlyphTexture.AtlasRegion.Size), charInfo.GlyphTexture.AtlasRegion, color, Matrix4x4.Identity);
 		}
-
-		ArrayPool<Renderer.RendererChar>.Shared.Return(chars);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void DrawText(string str, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(str, location, font, size, color);
 
-	internal readonly struct RendererChar(Point dest, BitmapFontGlyph glyph)
+	internal readonly struct RendererChar(Point dest, BitmapFont.GlyphTexture glyphTexture)
 	{
 		public readonly Point Dest = dest;
-		public readonly BitmapFontGlyph Glyph = glyph;
+		public readonly BitmapFont.GlyphTexture GlyphTexture = glyphTexture;
 	}
 
 	private T UseBatch<T>(T batch) where T : BatchRenderer
