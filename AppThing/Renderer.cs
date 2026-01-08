@@ -17,7 +17,6 @@ public sealed class Renderer : IDisposable
 	private readonly MultisampleFramebuffer _msaaBuffer;
 	internal readonly TextureManager TextureManager;
 	private readonly QuadRenderer _quadBatch;
-	private readonly BitmapFontRenderer _bitmapFontBatch;
 	private readonly VectorFontRenderer _vectorFontBatch;
 	private readonly int _msaaSamples;
 
@@ -49,7 +48,6 @@ public sealed class Renderer : IDisposable
 		_msaaBuffer = new(supportDepthBuffer: true);
 		TextureManager = new();
 		_quadBatch = new(this);
-		_bitmapFontBatch = new(this);
 		_vectorFontBatch = new(this);
 
 		Console.WriteLine($"[Renderer] OpenGL Renderer: {Gl.GetString(StringName.Renderer)}");
@@ -77,7 +75,6 @@ public sealed class Renderer : IDisposable
 
 		_msaaBuffer.Dispose();
 		_quadBatch.Dispose();
-		_bitmapFontBatch.Dispose();
 		_vectorFontBatch.Dispose();
 
 		TextureManager.Dispose();
@@ -122,7 +119,6 @@ public sealed class Renderer : IDisposable
 
 			_msaaBuffer.Setup(_size, _msaaSamples);
 			_quadBatch.HandleSizeChanged(_size);
-			_bitmapFontBatch.HandleSizeChanged(_size);
 			_vectorFontBatch.HandleSizeChanged(_size);
 			_sizeChanged = false;
 		}
@@ -165,8 +161,28 @@ public sealed class Renderer : IDisposable
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void DrawText(string str, Point location, BitmapFont font, Color color) => UseBatch(_bitmapFontBatch).DrawText(str, location, font, color);
+	public void DrawText(string str, Point location, BitmapFont font, Color color)
+	{
+		var chars = ArrayPool<Renderer.RendererChar>.Shared.Rent(str.Length);
+		var charCount = 0;
+
+		var penX = 0L;
+		var penY = 0L;
+
+		foreach (var c in str)
+		{
+			if (font.TryGetGlyph(new(c), ref penX, ref penY, out var fontGlyph, out var drawPos))
+				chars[charCount++] = new(drawPos, fontGlyph);
+		}
+
+		for (var i = 0; i < charCount; i++)
+		{
+			var charInfo = chars[i];
+			UseBatch(_quadBatch).Draw(charInfo.Glyph.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.Glyph.AtlasRegion.Size), charInfo.Glyph.AtlasRegion, color, Matrix4x4.Identity);
+		}
+
+		ArrayPool<Renderer.RendererChar>.Shared.Return(chars);
+	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void DrawText(string str, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(str, location, font, size, color);

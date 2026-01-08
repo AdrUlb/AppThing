@@ -132,7 +132,7 @@ public sealed class BitmapFont : IDisposable
 		else if (atlasSize > 4096)
 			atlasSize = 4096;
 
-		var newAtlasTexture = new Texture(new(atlasSize, atlasSize), Color.Black, TextureFormat.BitmapFont);
+		var newAtlasTexture = new Texture(new(atlasSize, atlasSize), Color.Black, TextureFormat.AlphaOnly);
 		var newAtlas = new AtlasGenerator(newAtlasTexture);
 		_textureAtlases.Add(newAtlas);
 

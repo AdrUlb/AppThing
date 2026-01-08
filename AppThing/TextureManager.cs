@@ -27,12 +27,11 @@ internal sealed class TextureManager : IDisposable
 
 	public Texture? CurrentTexture { get; private set; } = null;
 
-	public bool Use(Texture texture, bool checkChanges = true)
+	public void Use(Texture texture, bool checkChanges = true)
 	{
 		// If the texture is already "known", return the corresponding GL texture
 		if (_textureMap.TryGetValue(texture, out var glTexture))
 		{
-			glTexture.Bind();
 			if (checkChanges)
 			{
 				if (HasTextureChanged(texture, out var changedRegion))
@@ -43,7 +42,7 @@ internal sealed class TextureManager : IDisposable
 				}
 			}
 
-			return false;
+			goto end;
 		}
 
 		// Subscribe to notifications regarding the texture's state
@@ -61,7 +60,7 @@ internal sealed class TextureManager : IDisposable
 		{
 			TextureFormat.Rgba => InternalFormat.Rgba8,
 			TextureFormat.Rgb => InternalFormat.Rgb8,
-			TextureFormat.BitmapFont => InternalFormat.Red,
+			TextureFormat.AlphaOnly => InternalFormat.Red,
 			_ => throw new NotSupportedException($"Unsupported texture format: {texture.Format}")
 		};
 
@@ -74,14 +73,24 @@ internal sealed class TextureManager : IDisposable
 		lock (_changedTexturesLock)
 			_changedTextures.TryAdd(texture, new Rectangle(new Point(0, 0), texture.Size));
 
-		glTexture.Bind();
-
 		HandleChanged(texture, new(new(0, 0), texture.Size));
 		lock (_changedTexturesLock)
 			_changedTextures.Remove(texture);
 
+		end:
+		switch (texture.Format)
+		{
+			case TextureFormat.AlphaOnly:
+				glTexture.SetParameter(TextureParameterName.TextureSwizzleRgba, [(int)GL.ONE, (int)GL.ONE, (int)GL.ONE, (int)GL.RED]);
+				break;
+			default:
+				glTexture.SetParameter(TextureParameterName.TextureSwizzleRgba, [(int)GL.RED, (int)GL.GREEN, (int)GL.BLUE, (int)GL.ALPHA]);
+				break;
+		}
+			
+		
+		glTexture.Bind();
 		CurrentTexture = texture;
-		return true;
 	}
 
 	public void EndFrame()
@@ -145,6 +154,7 @@ internal sealed class TextureManager : IDisposable
 
 		glTexture.SubImage2D(0, region, PixelFormat.Rgba, PixelType.UnsignedByte, pixels.AsSpan()[..pixelsByteCount]);
 		ArrayPool<byte>.Shared.Return(pixels);
+
 		glTexture.GenerateMipmap();
 
 		if (CurrentTexture != null)

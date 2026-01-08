@@ -20,7 +20,7 @@ public enum TextureFormat : byte
 {
 	Rgba,
 	Rgb,
-	BitmapFont,
+	AlphaOnly,
 }
 
 public sealed class Texture : IDisposable
