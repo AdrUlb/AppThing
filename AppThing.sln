@@ -20,6 +20,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "ConsoleApp1\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FontThing", "FontThing\FontThing.csproj", "{F9FAAE4B-A66C-4B5F-A025-95FB9B302238}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp2", "ConsoleApp2\ConsoleApp2.csproj", "{759AED28-9853-48B3-B0FF-5C1A3FF7F9DC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -58,6 +60,10 @@ Global
 		{F9FAAE4B-A66C-4B5F-A025-95FB9B302238}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F9FAAE4B-A66C-4B5F-A025-95FB9B302238}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F9FAAE4B-A66C-4B5F-A025-95FB9B302238}.Release|Any CPU.Build.0 = Release|Any CPU
+		{759AED28-9853-48B3-B0FF-5C1A3FF7F9DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{759AED28-9853-48B3-B0FF-5C1A3FF7F9DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{759AED28-9853-48B3-B0FF-5C1A3FF7F9DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{759AED28-9853-48B3-B0FF-5C1A3FF7F9DC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D34272A4-5B7F-4161-827C-3B5842F81330} = {19E15A72-94CB-4E4C-8980-679A3373778E}
