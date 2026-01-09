@@ -25,11 +25,14 @@ internal static class Program
 		var accumulator = 0.0;
 		var fpsString = "FPS: N/A";
 
-		var str = $"\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
+		var text = $"\nFPS: Hello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
 
-		for (var i = 0; i < 100; i++)
-			str += "\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent pharetra, magna quis convallis feugiat, nisl est condimentum ipsum, sit amet accumsan velit lectus ut orci. Aenean cursus mattis elementum. Mauris gravida orci vel tempor feugiat. In non congue elit.";
+		for (var i = 0; i < 1000; i++)
+			text += "\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent pharetra, magna quis convallis feugiat, nisl est condimentum ipsum, sit amet accumsan velit lectus ut orci. Aenean cursus mattis elementum. Mauris gravida orci vel tempor feugiat. In non congue elit.";
 
+		var textLayout = new TextLayout(text);
+
+		// Calculations for FPS stuff
 		window.Draw += (renderer, delta) =>
 		{
 			accumulator += delta;
@@ -44,12 +47,9 @@ internal static class Program
 
 			//renderer.DrawText(fpsString, new(10, 0), font, fontSize, textColor);
 			//renderer.DrawText(str, new(10, 0), font, fontSize, textColor);
-			
-			renderer.DrawText(fpsString, new(10, 0), font, textColor);
-			renderer.DrawText(str, new(10, 0), font, textColor);
 
-			//fontSize += (float)delta * 20f;
-			//Console.WriteLine(fpsString + ", Font Size: " + fontSize);
+			renderer.DrawText(textLayout, new(10, 0), font, textColor);
+			renderer.DrawText(new TextLayout(fpsString), new(10, 0), font, Color.White);
 		};
 
 		window.CloseRequested += w =>

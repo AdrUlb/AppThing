@@ -12,7 +12,7 @@ public enum GlyphOutlineRenderOptions
 	None = 0,
 	StemDarkening = 1 << 0,
 	Gamma = 1 << 1,
-	Default = StemDarkening,
+	Default = None,
 }
 
 public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax)
@@ -32,7 +32,7 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 
 	public abstract IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance);
 
-	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 4, float bezierTolerance = 0.2f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
+	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 4, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
 	{
 		var scale = Font.PointSizeToScale(pointSize);
 		var stemDarkening = (options & GlyphOutlineRenderOptions.StemDarkening) != 0 ? TrueTypeRasterizer.CalculateStemDarkening(Font.GetPixelsPerEm(pointSize)) : 0;
@@ -74,13 +74,13 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 				(p0, p1, p2) =>
 				{
 					var result = BezierSubdivider.RecursiveBezier(
-						new(p0.X, p0.Y),
-						new(p1.X, p1.Y),
-						new(p2.X, p2.Y),
+						new Vector2(p0.X, p0.Y) * scale,
+						new Vector2(p1.X, p1.Y) * scale,
+						new Vector2(p2.X, p2.Y) * scale,
 						bezierTolerance
 					);
 
-					lines.AddRange(result.Skip(1).Select(p => p * scale));
+					lines.AddRange(result.Skip(1));
 				}
 			);
 

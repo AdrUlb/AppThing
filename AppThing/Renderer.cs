@@ -124,7 +124,7 @@ public sealed class Renderer : IDisposable
 			_sizeChanged = false;
 		}
 
-		_msaaBuffer.BeginFrame();
+		//_msaaBuffer.BeginFrame();
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -137,8 +137,8 @@ public sealed class Renderer : IDisposable
 	internal void EndFrame()
 	{
 		_currentBatch?.Commit();
-		_msaaBuffer.EndFrame();
-		_msaaBuffer.Blit();
+		//_msaaBuffer.EndFrame();
+		//_msaaBuffer.Blit();
 		TextureManager.EndFrame();
 
 		Sdl.GL_SwapWindow(_window.SdlWindowPtr.Value);
@@ -162,39 +162,40 @@ public sealed class Renderer : IDisposable
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
 
-	private readonly List<RendererChar> _charBuffer = [];
+	private readonly List<TextLayout.BitmapChar> _charBuffer = [];
 
-	public void DrawText(string str, Point location, BitmapFont font, Color color)
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void DrawText(string text, Point location, BitmapFont font, Color color)
 	{
 		_charBuffer.Clear();
+		TextLayout.ComputeLayout(text, font, _charBuffer);
+		DrawText(CollectionsMarshal.AsSpan(_charBuffer), location, color);
+	}
 
-		var penX = 0L;
-		var penY = 0L;
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void DrawText(TextLayout textLayout, Point location, BitmapFont font, Color color)
+	{
+		var span = textLayout.GetChars(font);
+		DrawText(span, location, color);
+	}
 
-		foreach (var c in str.EnumerateRunes())
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private void DrawText(ReadOnlySpan<TextLayout.BitmapChar> span, Point location, Color color)
+	{
+		foreach (var charInfo in span)
 		{
-			if (!font.TryGetGlyph(c, ref penX, ref penY, out var fontGlyph, out var drawPos))
-				continue;
-
-			if (drawPos.Y >= _size.Height)
+			if (charInfo.Dest.Y >= _size.Height)
 				break;
 
-			if (drawPos.X >= _size.Width)
+			if (charInfo.Dest.X >= _size.Width)
 				continue;
 
-			_charBuffer.Add(new(drawPos, fontGlyph));
-		}
-
-		var span = CollectionsMarshal.AsSpan(_charBuffer);
-		for (var i = 0; i < span.Length; i++)
-		{
-			ref var charInfo = ref span[i];
 			UseBatch(_quadBatch).Draw(charInfo.GlyphTexture.Atlas, new(new(charInfo.Dest.X + location.X, charInfo.Dest.Y + location.Y), charInfo.GlyphTexture.AtlasRegion.Size), charInfo.GlyphTexture.AtlasRegion, color, Matrix4x4.Identity);
 		}
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void DrawText(string str, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(str, location, font, size, color);
+	public void DrawText(string text, Point location, VectorFont font, float size, Color color) => UseBatch(_vectorFontBatch).DrawText(text, location, font, size, color);
 
 	internal readonly struct RendererChar(Point dest, BitmapFont.GlyphTexture glyphTexture)
 	{
