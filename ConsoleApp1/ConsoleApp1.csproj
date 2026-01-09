@@ -46,7 +46,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\AppThing\AppThing.csproj" />
-		<ProjectReference Include="..\FontThing.TrueType\FontThing.TrueType.csproj" />
+		<ProjectReference Include="..\FontThing\FontThing.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using System.Text;
 
-namespace FontThing.TrueType.Parsing;
+namespace FontThing.Parsing;
 
 public sealed class GlyphBitmap(byte[] data, Size size)
 {

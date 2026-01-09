@@ -1,6 +1,6 @@
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing.Tables;
+namespace FontThing.Parsing.Tables;
 
 internal readonly struct CmapFormat12 : ICmapFormat
 {

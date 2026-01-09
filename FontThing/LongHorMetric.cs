@@ -1,4 +1,4 @@
-namespace FontThing.TrueType;
+namespace FontThing;
 
 public readonly struct LongHorMetric(ushort advanceWidth, short leftSideBearing)
 {

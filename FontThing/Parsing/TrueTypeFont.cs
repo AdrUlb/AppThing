@@ -1,9 +1,9 @@
-using FontThing.TrueType.Parsing.Tables;
+using FontThing.Parsing.Tables;
 using System.Drawing;
 using System.Text;
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing;
+namespace FontThing.Parsing;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html
 

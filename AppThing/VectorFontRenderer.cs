@@ -1,4 +1,4 @@
-using FontThing.TrueType.Parsing;
+using FontThing.Parsing;
 using GLCS;
 using GLCS.Managed;
 using System.Drawing;

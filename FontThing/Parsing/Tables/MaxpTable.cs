@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing.Tables;
+namespace FontThing.Parsing.Tables;
 
 internal sealed class MaxpTable
 {

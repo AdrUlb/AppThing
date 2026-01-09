@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.Text;
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing;
+namespace FontThing.Parsing;
 
 internal sealed class TableDirectory
 {

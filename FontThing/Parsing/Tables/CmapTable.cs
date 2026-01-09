@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing.Tables;
+namespace FontThing.Parsing.Tables;
 
 // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6cmap.html
 

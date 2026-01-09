@@ -1,4 +1,4 @@
-namespace FontThing.TrueType.Parsing;
+namespace FontThing.Parsing;
 
 public struct GlyphOutlinePoint
 {

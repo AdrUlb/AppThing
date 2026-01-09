@@ -1,4 +1,4 @@
-using FontThing.TrueType.Parsing;
+using FontThing.Parsing;
 using System.Drawing;
 using System.Runtime.CompilerServices;
 using System.Text;

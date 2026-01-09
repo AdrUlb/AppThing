@@ -1,6 +1,6 @@
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing;
+namespace FontThing.Parsing;
 
 internal readonly struct OffsetSubtable(StreamPrimitiveReader reader)
 {

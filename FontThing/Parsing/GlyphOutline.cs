@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing;
+namespace FontThing.Parsing;
 
 [Flags]
 public enum GlyphOutlineRenderOptions

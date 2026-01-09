@@ -18,7 +18,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UtilThing", "UtilThing\Util
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleApp1", "ConsoleApp1\ConsoleApp1.csproj", "{21DC6DBC-4154-41A6-9DE2-A5E839E09B2E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FontThing.TrueType", "FontThing.TrueType\FontThing.TrueType.csproj", "{F9FAAE4B-A66C-4B5F-A025-95FB9B302238}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FontThing", "FontThing\FontThing.csproj", "{F9FAAE4B-A66C-4B5F-A025-95FB9B302238}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

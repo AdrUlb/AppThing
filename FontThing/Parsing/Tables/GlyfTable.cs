@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Frozen;
 using UtilThing;
 
-namespace FontThing.TrueType.Parsing.Tables;
+namespace FontThing.Parsing.Tables;
 
 [Flags]
 internal enum SimpleGlyphOutlineFlags : byte

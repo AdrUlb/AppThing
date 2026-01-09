@@ -1,9 +1,9 @@
+using FontThing.Parsing;
 using System.Buffers;
 using System.Diagnostics;
 using System.Numerics;
-using FontThing.TrueType.Parsing;
 
-namespace FontThing.TrueType;
+namespace FontThing;
 
 public static class TrueTypeRasterizer
 {

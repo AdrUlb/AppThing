@@ -10,7 +10,7 @@
     <ItemGroup>
         <ProjectReference Include="..\External\GLCS\GLCS.Managed\GLCS.Managed.csproj"/>
         <ProjectReference Include="..\External\SDL3CS\SDL3CS\SDL3CS.csproj" />
-        <ProjectReference Include="..\FontThing.TrueType\FontThing.TrueType.csproj" />
+        <ProjectReference Include="..\FontThing\FontThing.csproj" />
     </ItemGroup>
 
 </Project>
