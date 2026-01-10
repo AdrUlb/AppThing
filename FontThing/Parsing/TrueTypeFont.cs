@@ -86,7 +86,7 @@ public sealed class TrueTypeFont
 		return glyph;
 	}
 
-	internal GlyphOutline? GetGlyphOutlineFromIndex(uint glyphIndex)
+	public GlyphOutline? GetGlyphOutlineFromIndex(uint glyphIndex)
 	{
 		var glyphOffset = _locaTable.Offsets[glyphIndex];
 

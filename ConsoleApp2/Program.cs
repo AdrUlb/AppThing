@@ -1,16 +1,20 @@
 ﻿using FontThing.Parsing;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using UtilThing;
 using Point = System.Drawing.Point;
 using RectangleF = System.Drawing.RectangleF;
 
 namespace ConsoleApp2;
 
-internal abstract class Edge(Point[] points)
+internal abstract class Edge(Vector2[] points)
 {
-	public Point[] Points { get; } = points;
+	protected const double Epsilon = 1e-5;
+
+	public Vector2[] Points { get; } = points;
 
 	// Returns distance from point to edge, and parameter t along edge
 	public abstract float GetDistance(Vector2 point, out float t);
@@ -19,30 +23,30 @@ internal abstract class Edge(Point[] points)
 	public abstract int IntersectRay(Vector2 point);
 }
 
-internal sealed class LineEdge(Point p0, Point p1) : Edge([p0, p1])
+internal sealed class LineEdge(Vector2 p0, Vector2 p1) : Edge([p0, p1])
 {
-	public ref Point P0 => ref Points[0];
-	public ref Point P1 => ref Points[1];
+	public ref Vector2 P0 => ref Points[0];
+	public ref Vector2 P1 => ref Points[1];
 
 	public override float GetDistance(Vector2 point, out float t)
 	{
-		var start = P0.ToVector2();
-		var end = P1.ToVector2();
+		var p0 = P0;
+		var p1 = P1;
 
 		// Translate line and p such that start is at origin
-		var lineVec = end - start;
-		var pointVec = point - start;
+		var lineVec = p1 - p0;
+		var pointVec = point - p0;
 
 		t = Vector2.Dot(pointVec, lineVec) / Vector2.Dot(lineVec, lineVec);
 
-		var projection = start + float.Clamp(t, 0.0f, 1.0f) * lineVec;
+		var projection = p0 + float.Clamp(t, 0.0f, 1.0f) * lineVec;
 		return Vector2.Distance(point, projection);
 	}
 
 	public override int IntersectRay(Vector2 point)
 	{
-		var p0 = P0.ToVector2();
-		var p1 = P1.ToVector2();
+		var p0 = P0;
+		var p1 = P1;
 
 		// Ensure p0.Y <= p1.Y
 		if (p0.Y > p1.Y)
@@ -56,17 +60,17 @@ internal sealed class LineEdge(Point p0, Point p1) : Edge([p0, p1])
 	}
 }
 
-internal sealed class BezierEdge(Point p0, Point p1, Point p2) : Edge([p0, p1, p2])
+internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0, p1, p2])
 {
-	public ref Point P0 => ref Points[0];
-	public ref Point P1 => ref Points[1];
-	public ref Point P2 => ref Points[2];
+	public ref Vector2 P0 => ref Points[0];
+	public ref Vector2 P1 => ref Points[1];
+	public ref Vector2 P2 => ref Points[2];
 
 	public override float GetDistance(Vector2 point, out float t)
 	{
-		var p0 = P0.ToVector2();
-		var p1 = P1.ToVector2();
-		var p2 = P2.ToVector2();
+		var p0 = P0;
+		var p1 = P1;
+		var p2 = P2;
 
 		var (a, b, c, d) = GetDistanceCubicCoefficients(p0, p1, p2, point);
 		Span<double> roots = stackalloc double[3];
@@ -76,7 +80,7 @@ internal sealed class BezierEdge(Point p0, Point p1, Point p2) : Edge([p0, p1, p
 		t = 0.0f;
 		foreach (var candidate in (ReadOnlySpan<double>)[..roots, 0, 1])
 		{
-			if (candidate is < 0.0 or > 1.0)
+			if (candidate is < Epsilon or > 1.0 + Epsilon)
 				continue;
 
 			var tCand = (float)candidate;
@@ -123,9 +127,9 @@ internal sealed class BezierEdge(Point p0, Point p1, Point p2) : Edge([p0, p1, p
 
 	public override int IntersectRay(Vector2 point)
 	{
-		var p0 = P0.ToVector2();
-		var p1 = P1.ToVector2();
-		var p2 = P2.ToVector2();
+		var p0 = P0;
+		var p1 = P1;
+		var p2 = P2;
 
 		var a = p0.Y - 2 * p1.Y + p2.Y;
 		var b = 2 * (p1.Y - p0.Y);
@@ -146,27 +150,35 @@ internal sealed class BezierEdge(Point p0, Point p1, Point p2) : Edge([p0, p1, p
 			if (discriminant >= 0)
 			{
 				var sqrtDiscriminant = float.Sqrt(discriminant);
-				var inv2a = 1.0f / (2.0f * a);
+				var inv2A = 1.0f / (2.0f * a);
 
-				CheckT((-b - sqrtDiscriminant) * inv2a);
-				CheckT((-b + sqrtDiscriminant) * inv2a);
+				CheckT((-b - sqrtDiscriminant) * inv2A);
+				CheckT((-b + sqrtDiscriminant) * inv2A);
 			}
 		}
-
-		/*
-		Span<double> roots = stackalloc double[2];
-		roots = Equations.SolveQuadratic(a, b, c, roots);
-		foreach (var root in roots)
-			CheckT((float)root);
-		*/
 
 		return intersections;
 
 		void CheckT(float t)
 		{
-			if (t is < 0.0f or >= 1.0f)
+			if (t <= -Epsilon || t >= 1.0 + Epsilon)
 				return;
 
+			var dy = 2 * (1 - t) * (p1.Y - p0.Y) + 2 * t * (p2.Y - p1.Y);
+			if (float.Abs(dy) < Epsilon)
+				return;
+			
+			if (dy > 0)
+			{
+				if (t >= 1.0f - Epsilon)
+					return;
+			}
+			else
+			{
+				if (t <= Epsilon)
+					return;
+			}
+			
 			var tInv = 1 - t;
 			var bezierPoint = tInv * tInv * p0 + 2 * tInv * t * p1 + t * t * p2;
 
@@ -207,9 +219,8 @@ internal sealed class Shape(List<Contour> contours)
 
 		foreach (var point in Contours.SelectMany(contour => contour.Edges).SelectMany(edge => edge.Points))
 		{
-			var vec = point.ToVector2();
-			min = Vector2.Min(min, vec);
-			max = Vector2.Max(max, vec);
+			min = Vector2.Min(min, point);
+			max = Vector2.Max(max, point);
 		}
 
 		return new(min.X, min.Y, max.X - min.X, max.Y - min.Y);
@@ -220,35 +231,16 @@ internal static class Program
 {
 	private static void Main()
 	{
-		const float pxRange = 4.0f;
-		const int size = 64;
+		const float pxRange = 4.0f * 8;
+		const int size = 64 * 8;
 
-		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/segoeui.ttf");
+		//var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/segoeui.ttf");
+		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/seguiemj.ttf");
 		var glyph = font.LoadGlyph("&".EnumerateRunes().First());
-		if (glyph.Outline is not SimpleGlyphOutline outline)
-			throw new("FIXME");
 
+		var outline = glyph.Outline ?? throw new("FIXME");
 		var contours = new List<Contour>();
-
-		for (var i = 0; i < outline.NumberOfContours; i++)
-		{
-			var edges = new List<Edge>();
-
-			outline.ProcessContour(i, Line, Bezier);
-			contours.Add(new(edges));
-			continue;
-
-			void Line(Point p0, Point p1)
-			{
-				edges.Add(new LineEdge(p0, p1));
-			}
-
-			void Bezier(Point p0, Point p1, Point p2)
-			{
-				edges.Add(new BezierEdge(p0, p1, p2));
-			}
-		}
-
+		LoadContours(outline, contours);
 		var shape = new Shape(contours);
 
 		var glyphBounds = shape.GetBounds();
@@ -263,7 +255,7 @@ internal static class Program
 		// Compute offset to center of shape
 		var offset = new Vector2(-size / 2.0f + pxRange) / scale + (glyphSize / 2.0f) + glyphLocation;
 
-		var sdfBuffer = new byte[size * size];
+		var buffer = new byte[size * size];
 
 		for (var y = 0; y < size; y++)
 		{
@@ -283,7 +275,7 @@ internal static class Program
 
 				var pixelValue = (byte)(float.Clamp(normalized, 0.0f, 1.0f) * 255);
 
-				sdfBuffer[y * size + x] = pixelValue;
+				buffer[x + y * size] = pixelValue;
 			}
 		}
 
@@ -292,11 +284,87 @@ internal static class Program
 		{
 			for (var x = 0; x < size; x++)
 			{
-				var value = sdfBuffer[y * size + x];
-				image[x, y] = new Rgba32(value, value, value, 255);
+				var value = buffer[y * size + x];
+				image[x, y] = new(value, value, value, 255);
 			}
 		}
 
 		image.SaveAsPng("sdf_output.png");
+	}
+
+	private static void LoadContours(GlyphOutline outline, List<Contour> contours)
+	{
+		switch (outline)
+		{
+			case SimpleGlyphOutline o:
+				LoadContours(o, contours);
+				return;
+			case CompoundGlyphOutline o:
+				LoadContours(o, contours);
+				return;
+			default:
+				throw new NotSupportedException("Unsupported glyph outline type");
+		}
+
+	}
+
+	private static void LoadContours(SimpleGlyphOutline outline, List<Contour> contours)
+	{
+		for (var i = 0; i < outline.NumberOfContours; i++)
+		{
+			var edges = new List<Edge>();
+
+			outline.ProcessContour(i, Line, Bezier);
+			contours.Add(new(edges));
+			continue;
+
+			void Line(Point p0, Point p1)
+			{
+				edges.Add(new LineEdge(p0.ToVector2(), p1.ToVector2()));
+			}
+
+			void Bezier(Point p0, Point p1, Point p2)
+			{
+				edges.Add(new BezierEdge(p0.ToVector2(), p1.ToVector2(), p2.ToVector2()));
+			}
+		}
+	}
+
+	private static void LoadContours(CompoundGlyphOutline outline, List<Contour> contours)
+	{
+		foreach (var component in outline.Components)
+		{
+			if (!component.ArgsAreXyValues)
+				throw new NotImplementedException();
+
+			var componentOutline = outline.Font.GetGlyphOutlineFromIndex(component.GlyphIndex);
+			Debug.Assert(componentOutline != null);
+
+			var index = contours.Count;
+			LoadContours(componentOutline, contours);
+			for (var i = index; i < contours.Count; i++)
+			{
+				var contour = contours[i];
+				for (var j = 0; j < contour.Edges.Count; j++)
+				{
+					ref var edge = ref CollectionsMarshal.AsSpan(contour.Edges)[j];
+
+					for (var k = 0; k < edge.Points.Length; k++)
+					{
+						ref var p = ref edge.Points[k];
+
+						// Apply scaling
+						var scaledX = p.X * (float)component.ScaleX + p.Y * (float)component.Scale01;
+						var scaledY = p.X * (float)component.Scale10 + p.Y * (float)component.ScaleY;
+
+						// Apply translation
+						scaledX += component.Arg1;
+						scaledY += component.Arg2;
+
+						p = new(scaledX, scaledY);
+					}
+				}
+			}
+		}
 	}
 }
