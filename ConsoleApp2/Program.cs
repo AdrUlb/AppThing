@@ -2,7 +2,6 @@
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using UtilThing;
@@ -11,115 +10,112 @@ using RectangleF = System.Drawing.RectangleF;
 
 namespace ConsoleApp2;
 
-internal abstract class Edge(Vector2[] points)
+internal abstract class Edge(Vector2d[] points)
 {
 	protected const double Epsilon = 1e-9;
 
-	public Vector2[] Points { get; } = points;
+	public Vector2d[] Points { get; } = points;
 
 	// Returns distance from point to edge, and parameter t along edge
-	public abstract float GetDistance(Vector2 point, out float t);
+	public abstract double GetDistance(Vector2d point, out double t);
 
 	// Returns number of intersections with ray extending to the right from point
-	public abstract int IntersectRay(Vector2 point);
+	public abstract int IntersectRay(Vector2d point);
 }
 
-internal sealed class LineEdge(Vector2 p0, Vector2 p1) : Edge([p0, p1])
+internal sealed class LineEdge(Vector2d p0, Vector2d p1) : Edge([p0, p1])
 {
-	public ref Vector2 P0 => ref Points[0];
-	public ref Vector2 P1 => ref Points[1];
+	public ref Vector2d P0 => ref Points[0];
+	public ref Vector2d P1 => ref Points[1];
 
-	public override float GetDistance(Vector2 point, out float t)
+	public override double GetDistance(Vector2d point, out double t)
 	{
 		var p0 = P0;
 		var p1 = P1;
 		// Handle zero-length line
-		if (Vector2.Distance(p0, p1) < Epsilon)
+		if (Vector2d.Distance(p0, p1) < Epsilon)
 		{
-			t = 0.0f;
-			var distance = Vector2.Distance(point, p0);
-			Debug.Assert(!float.IsNaN(distance));
+			t = 0.0;
+			var distance = Vector2d.Distance(point, p0);
+			Debug.Assert(!double.IsNaN(distance));
 			return distance;
 		}
 
 		var lineVec = p1 - p0;
 		var pointVec = point - p0;
 
-		t = Vector2.Dot(pointVec, lineVec) / Vector2.Dot(lineVec, lineVec);
+		t = Vector2d.Dot(pointVec, lineVec) / lineVec.LengthSquared();
 
-		var projection = p0 + float.Clamp(t, 0.0f, 1.0f) * lineVec;
+		var projection = p0 + double.Clamp(t, 0.0, 1.0) * lineVec;
 
 		{
-			var distance = Vector2.Distance(point, projection);
-			Debug.Assert(!float.IsNaN(distance));
+			var distance = Vector2d.Distance(point, projection);
+			Debug.Assert(!double.IsNaN(distance));
 			return distance;
 		}
 	}
 
-	public override int IntersectRay(Vector2 point)
+	public override int IntersectRay(Vector2d point)
 	{
 		var p0 = P0;
 		var p1 = P1;
 
-		// Ensure p0.Y <= p1.Y
-		if (p0.Y > p1.Y)
-			(p0, p1) = (p1, p0);
+		var cond0 = p0.Y > point.Y;
+		var cond1 = p1.Y > point.Y;
 
-		// Point is entirely above or below the edge
-		if (point.Y < p0.Y || point.Y >= p1.Y)
+		// Both points are on same side of ray, no intersection
+		if (cond0 == cond1)
 			return 0;
 
-		return point.X < (p1.X - p0.X) * (point.Y - p0.Y) / (p1.Y - p0.Y) + p0.X ? 1 : 0;
+		// Compute intersection X coordinate
+		var intersectX = (p1.X - p0.X) * (point.Y - p0.Y) / (p1.Y - p0.Y) + p0.X;
+
+		// Check if intersection is to the right of point
+		return point.X < intersectX ? 1 : 0;
 	}
 }
 
-internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0, p1, p2])
+internal sealed class BezierEdge(Vector2d p0, Vector2d p1, Vector2d p2) : Edge([p0, p1, p2])
 {
-	public ref Vector2 P0 => ref Points[0];
-	public ref Vector2 P1 => ref Points[1];
-	public ref Vector2 P2 => ref Points[2];
+	public ref Vector2d P0 => ref Points[0];
+	public ref Vector2d P1 => ref Points[1];
+	public ref Vector2d P2 => ref Points[2];
 
-	public override float GetDistance(Vector2 point, out float t)
+	public override double GetDistance(Vector2d point, out double t)
 	{
 		var p0 = P0;
 		var p1 = P1;
 		var p2 = P2;
 
 		var (a, b, c, d) = GetDistanceCubicCoefficients(p0, p1, p2, point);
+
 		Span<double> roots = stackalloc double[3];
 		roots = Equations.SolveCubic(a, b, c, d, roots);
 
-		var minDistance = float.MaxValue;
-		t = 0.0f;
+		var minDistance = double.MaxValue;
+		t = 0.0;
 		foreach (var candidate in (ReadOnlySpan<double>)[..roots, 0, 1])
 		{
-			if (candidate is < Epsilon or > 1.0 + Epsilon)
+			if (candidate is <= 0.0 or >= 1.0)
 				continue;
 
-			var tCand = (float)candidate;
-			var tInv = 1 - tCand;
-			var bezierPoint = tInv * tInv * p0 + 2 * tInv * tCand * p1 + tCand * tCand * p2;
+			var tInv = 1 - candidate;
+			var bezierPoint = tInv * tInv * p0 + 2 * tInv * candidate * p1 + candidate * candidate * p2;
 
-			// Clamp to endpoints
-			if (tCand < 0.0f)
-				bezierPoint = p0;
-			else if (tCand > 1.0f)
-				bezierPoint = p2;
+			var distance = Vector2d.Distance(point, bezierPoint);
 
-			var distance = Vector2.Distance(point, bezierPoint);
-
-			if (distance >= minDistance)
-				continue;
-
-			minDistance = distance;
-			t = tCand;
+			if (distance < minDistance)
+			{
+				minDistance = distance;
+				t = candidate;
+			}
 		}
 
-		Debug.Assert(!float.IsNaN(minDistance));
+		Debug.Assert(!double.IsNaN(minDistance));
 		return minDistance;
 	}
 
-	private static (float a, float b, float c, float d) GetDistanceCubicCoefficients(Vector2 p0, Vector2 p1, Vector2 p2, Vector2 point)
+	private static (double a, double b, double c, double d) GetDistanceCubicCoefficients(Vector2d p0, Vector2d p1, Vector2d p2, Vector2d point)
 	{
 		// Bezier curve: B(t) = (1 - t)^2 * P0 + 2(1 - t)t * P1 + t^2 * P2
 		// Polynomial form: B(t) = At^2 + Bt + C
@@ -138,14 +134,14 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 		//	b = 3 * (A . B)
 		//	c = (B . B) + 2 * (C . A)
 		//	d = (C . B)
-		var a = 2 * Vector2.Dot(vecA, vecA);
-		var b = 3 * Vector2.Dot(vecA, vecB);
-		var c = Vector2.Dot(vecB, vecB) + 2 * Vector2.Dot(vecC, vecA);
-		var d = Vector2.Dot(vecC, vecB);
+		var a = 2 * Vector2d.Dot(vecA, vecA);
+		var b = 3 * Vector2d.Dot(vecA, vecB);
+		var c = Vector2d.Dot(vecB, vecB) + 2 * Vector2d.Dot(vecC, vecA);
+		var d = Vector2d.Dot(vecC, vecB);
 		return (a, b, c, d);
 	}
 
-	public override int IntersectRay(Vector2 point)
+	public override int IntersectRay(Vector2d point)
 	{
 		var p0 = P0;
 		var p1 = P1;
@@ -157,9 +153,9 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 
 		var intersections = 0;
 
-		if (float.Abs(a) < 1e-5)
+		if (double.Abs(a) < 1e-14)
 		{
-			if (float.Abs(b) > 1e-5)
+			if (double.Abs(b) > 1e-14)
 				CheckT(-c / b);
 		}
 		else
@@ -169,41 +165,31 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 			// Only real roots imply intersection
 			if (discriminant >= 0)
 			{
-				var sqrtDiscriminant = float.Sqrt(discriminant);
-				var inv2A = 1.0f / (2.0f * a);
+				var sqrtDiscriminant = double.Sqrt(discriminant);
+				var q = -0.5 * (b + Math.Sign(b) * sqrtDiscriminant);
+				if (b == 0)
+					q = -0.5 * sqrtDiscriminant;
 
-				CheckT((-b - sqrtDiscriminant) * inv2A);
-				CheckT((-b + sqrtDiscriminant) * inv2A);
+				CheckT(q / a);
+				if (q != 0)
+					CheckT(c / q);
 			}
 		}
 
 		return intersections;
 
-		void CheckT(float t)
+		void CheckT(double t)
 		{
-			if (t <= -Epsilon || t >= 1.0 + Epsilon)
+			if (t is < 0.0 or >= 1.0)
 				return;
-
-			var dy = 2 * (1 - t) * (p1.Y - p0.Y) + 2 * t * (p2.Y - p1.Y);
-			if (float.Abs(dy) < Epsilon)
-				return;
-
-			if (dy > 0)
-			{
-				if (t >= 1.0f - Epsilon)
-					return;
-			}
-			else
-			{
-				if (t <= Epsilon)
-					return;
-			}
 
 			var tInv = 1 - t;
-			var bezierPoint = tInv * tInv * p0 + 2 * tInv * t * p1 + t * t * p2;
+			var x = tInv * tInv * p0.X + 2 * tInv * t * p1.X + t * t * p2.X;
 
-			if (point.X < bezierPoint.X)
-				intersections++;
+			if (point.X >= x)
+				return;
+
+			intersections++;
 		}
 	}
 }
@@ -217,7 +203,7 @@ internal sealed class Shape(List<Contour> contours)
 {
 	public List<Contour> Contours { get; } = contours;
 
-	public bool ContainsPoint(Vector2 point)
+	public bool ContainsPoint(Vector2d point)
 	{
 		var windingNumber = Contours
 			.SelectMany(contour => contour.Edges)
@@ -226,21 +212,21 @@ internal sealed class Shape(List<Contour> contours)
 		return windingNumber % 2 != 0;
 	}
 
-	public float GetDistance(Vector2 point) => Contours
+	public double GetDistance(Vector2d point) => Contours
 		.SelectMany(contour => contour.Edges)
 		.Select(edge => edge.GetDistance(point, out _))
-		.Prepend(float.MaxValue)
+		.Prepend(double.MaxValue)
 		.Min();
 
-	public RectangleF GetBounds()
+	public RectangleD GetBounds()
 	{
-		var min = new Vector2(float.MaxValue, float.MaxValue);
-		var max = new Vector2(float.MinValue, float.MinValue);
+		var min = new Vector2d(double.MaxValue, double.MaxValue);
+		var max = new Vector2d(double.MinValue, double.MinValue);
 
 		foreach (var point in Contours.SelectMany(contour => contour.Edges).SelectMany(edge => edge.Points))
 		{
-			min = Vector2.Min(min, point);
-			max = Vector2.Max(max, point);
+			min = Vector2d.Min(min, point);
+			max = Vector2d.Max(max, point);
 		}
 
 		return new(min.X, min.Y, max.X - min.X, max.Y - min.Y);
@@ -251,8 +237,8 @@ internal static class Program
 {
 	private static void Main()
 	{
-		const float pxRange = 4.0f;
-		//const float pxRange = 0.5f;
+		const double pxRange = 4.0;
+		//const double pxRange = 0.5;
 		const int size = 64;
 
 		/*
@@ -272,8 +258,8 @@ internal static class Program
 		var shape = new Shape(contours);
 
 		var glyphBounds = shape.GetBounds();
-		var glyphSize = glyphBounds.Size.ToVector2();
-		var glyphLocation = glyphBounds.Location.ToVector2();
+		var glyphSize = glyphBounds.Size;
+		var glyphLocation = glyphBounds.Location;
 
 		var maxDimension = Math.Max(glyphBounds.Width, glyphBounds.Height);
 
@@ -281,14 +267,14 @@ internal static class Program
 		var scale = (size - 2 * pxRange) / maxDimension;
 
 		// Compute offset to center of shape
-		var offset = new Vector2(-size / 2.0f + pxRange) / scale + (glyphSize / 2.0f) + glyphLocation;
+		var offset = new Vector2d(-size / 2.0 + pxRange) / scale + (glyphSize / 2.0) + glyphLocation;
 
 		var buffer = new byte[size * size];
 		GenerateSdf(shape, size, size, buffer, offset, scale, pxRange);
 		SaveSdfAsPng("sdf_output.png", size, size, buffer);
 	}
 
-	private static void GenerateSdf(Shape shape, int width, int height, Span<byte> sdf, Vector2 offset, float scale, float pxRange)
+	private static void GenerateSdf(Shape shape, int width, int height, Span<byte> sdf, Vector2d offset, double scale, double pxRange)
 	{
 		for (var y = 0; y < height; y++)
 		{
@@ -297,16 +283,16 @@ internal static class Program
 				var fontX = (x / scale) + offset.X - (pxRange / scale);
 				var fontY = ((height - 1 - y) / scale) + offset.Y - (pxRange / scale);
 
-				var samplePoint = new Vector2(fontX, fontY);
+				var samplePoint = new Vector2d(fontX, fontY);
 
 				var distance = shape.GetDistance(samplePoint);
 				var inside = shape.ContainsPoint(samplePoint);
 				var signedDistance = inside ? distance : -distance;
 
 				var signedDistanceInPixels = signedDistance * scale;
-				var normalized = 0.5f + (signedDistanceInPixels / (2 * 0.5f));
+				var normalized = 0.5 + (signedDistanceInPixels / (2 * 0.5));
 
-				var pixelValue = (byte)(float.Clamp(normalized, 0.0f, 1.0f) * 255);
+				var pixelValue = (byte)(double.Clamp(normalized, 0.0, 1.0) * 255);
 
 				sdf[x + y * width] = pixelValue;
 			}
@@ -356,12 +342,12 @@ internal static class Program
 
 			void Line(Point p0, Point p1)
 			{
-				edges.Add(new LineEdge(p0.ToVector2(), p1.ToVector2()));
+				edges.Add(new LineEdge(p0.ToVector2d(), p1.ToVector2d()));
 			}
 
 			void Bezier(Point p0, Point p1, Point p2)
 			{
-				edges.Add(new BezierEdge(p0.ToVector2(), p1.ToVector2(), p2.ToVector2()));
+				edges.Add(new BezierEdge(p0.ToVector2d(), p1.ToVector2d(), p2.ToVector2d()));
 			}
 		}
 	}
@@ -390,8 +376,8 @@ internal static class Program
 						ref var p = ref edge.Points[k];
 
 						// Apply scaling
-						var scaledX = p.X * (float)component.ScaleX + p.Y * (float)component.Scale01;
-						var scaledY = p.X * (float)component.Scale10 + p.Y * (float)component.ScaleY;
+						var scaledX = p.X * (double)component.ScaleX + p.Y * (double)component.Scale01;
+						var scaledY = p.X * (double)component.Scale10 + p.Y * (double)component.ScaleY;
 
 						// Apply translation
 						scaledX += component.Arg1;
