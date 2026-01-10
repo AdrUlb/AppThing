@@ -100,6 +100,12 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 			var tInv = 1 - tCand;
 			var bezierPoint = tInv * tInv * p0 + 2 * tInv * tCand * p1 + tCand * tCand * p2;
 
+			// Clamp to endpoints
+			if (tCand < 0.0f)
+				bezierPoint = p0;
+			else if (tCand > 1.0f)
+				bezierPoint = p2;
+
 			var distance = Vector2.Distance(point, bezierPoint);
 
 			if (distance >= minDistance)
@@ -178,11 +184,6 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 			if (t <= -Epsilon || t >= 1.0 + Epsilon)
 				return;
 
-			/*
-			if (t is < 0.0f or > 1.0f)
-				return;
-			*/
-			
 			var dy = 2 * (1 - t) * (p1.Y - p0.Y) + 2 * t * (p2.Y - p1.Y);
 			if (float.Abs(dy) < Epsilon)
 				return;
@@ -260,28 +261,14 @@ internal static class Program
 		//var glyph = font.LoadGlyph(Rune.GetRuneAt("👍", 0));
 		var glyph = font.LoadGlyph(Rune.GetRuneAt("😭", 0));
 		*/
-		
+
 		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/segoeui.ttf");
-		var glyph = font.LoadGlyph(Rune.GetRuneAt("A", 0));
-		
-		
+		var glyph = font.LoadGlyph(Rune.GetRuneAt("B", 0));
+
+
 		var outline = glyph.Outline ?? throw new("FIXME");
 		var contours = new List<Contour>();
 		LoadContours(outline, contours);
-
-		/*
-		Console.WriteLine($"Contours:");
-		foreach (var contour in contours)
-		{
-			Console.WriteLine($"  Contour with {contour.Edges.Count} edges");
-			foreach (var edge in contour.Edges)
-			{
-				var pointsStr = string.Join(", ", edge.Points.Select(p => $"({p.X:F1}, {p.Y:F1})"));
-				Console.WriteLine($"    Edge: {pointsStr}");
-			}
-		}
-		*/
-
 		var shape = new Shape(contours);
 
 		var glyphBounds = shape.GetBounds();
@@ -297,13 +284,18 @@ internal static class Program
 		var offset = new Vector2(-size / 2.0f + pxRange) / scale + (glyphSize / 2.0f) + glyphLocation;
 
 		var buffer = new byte[size * size];
+		GenerateSdf(shape, size, size, buffer, offset, scale, pxRange);
+		SaveSdfAsPng("sdf_output.png", size, size, buffer);
+	}
 
-		for (var y = 0; y < size; y++)
+	private static void GenerateSdf(Shape shape, int width, int height, Span<byte> sdf, Vector2 offset, float scale, float pxRange)
+	{
+		for (var y = 0; y < height; y++)
 		{
-			for (var x = 0; x < size; x++)
+			for (var x = 0; x < width; x++)
 			{
 				var fontX = (x / scale) + offset.X - (pxRange / scale);
-				var fontY = ((size - 1 - y) / scale) + offset.Y - (pxRange / scale);
+				var fontY = ((height - 1 - y) / scale) + offset.Y - (pxRange / scale);
 
 				var samplePoint = new Vector2(fontX, fontY);
 
@@ -312,25 +304,28 @@ internal static class Program
 				var signedDistance = inside ? distance : -distance;
 
 				var signedDistanceInPixels = signedDistance * scale;
-				var normalized = 0.5f + (signedDistanceInPixels / (2 * pxRange));
+				var normalized = 0.5f + (signedDistanceInPixels / (2 * 0.5f));
 
 				var pixelValue = (byte)(float.Clamp(normalized, 0.0f, 1.0f) * 255);
 
-				buffer[x + y * size] = pixelValue;
+				sdf[x + y * width] = pixelValue;
 			}
 		}
+	}
 
-		using var image = new Image<Rgba32>(size, size);
-		for (var y = 0; y < size; y++)
+	private static void SaveSdfAsPng(string path, int width, int height, ReadOnlySpan<byte> sdf)
+	{
+		using var image = new Image<Rgba32>(width, height);
+		for (var y = 0; y < height; y++)
 		{
-			for (var x = 0; x < size; x++)
+			for (var x = 0; x < width; x++)
 			{
-				var value = buffer[y * size + x];
+				var value = sdf[y * width + x];
 				image[x, y] = new(value, value, value, 255);
 			}
 		}
 
-		image.SaveAsPng("sdf_output.png");
+		image.SaveAsPng(path);
 	}
 
 	private static void LoadContours(GlyphOutline outline, List<Contour> contours)
