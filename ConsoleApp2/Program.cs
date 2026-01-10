@@ -4,6 +4,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Text;
 using UtilThing;
 using Point = System.Drawing.Point;
 using RectangleF = System.Drawing.RectangleF;
@@ -12,7 +13,7 @@ namespace ConsoleApp2;
 
 internal abstract class Edge(Vector2[] points)
 {
-	protected const double Epsilon = 1e-5;
+	protected const double Epsilon = 1e-9;
 
 	public Vector2[] Points { get; } = points;
 
@@ -32,15 +33,27 @@ internal sealed class LineEdge(Vector2 p0, Vector2 p1) : Edge([p0, p1])
 	{
 		var p0 = P0;
 		var p1 = P1;
+		// Handle zero-length line
+		if (Vector2.Distance(p0, p1) < Epsilon)
+		{
+			t = 0.0f;
+			var distance = Vector2.Distance(point, p0);
+			Debug.Assert(!float.IsNaN(distance));
+			return distance;
+		}
 
-		// Translate line and p such that start is at origin
 		var lineVec = p1 - p0;
 		var pointVec = point - p0;
 
 		t = Vector2.Dot(pointVec, lineVec) / Vector2.Dot(lineVec, lineVec);
 
 		var projection = p0 + float.Clamp(t, 0.0f, 1.0f) * lineVec;
-		return Vector2.Distance(point, projection);
+
+		{
+			var distance = Vector2.Distance(point, projection);
+			Debug.Assert(!float.IsNaN(distance));
+			return distance;
+		}
 	}
 
 	public override int IntersectRay(Vector2 point)
@@ -96,6 +109,7 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 			t = tCand;
 		}
 
+		Debug.Assert(!float.IsNaN(minDistance));
 		return minDistance;
 	}
 
@@ -164,10 +178,15 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 			if (t <= -Epsilon || t >= 1.0 + Epsilon)
 				return;
 
+			/*
+			if (t is < 0.0f or > 1.0f)
+				return;
+			*/
+			
 			var dy = 2 * (1 - t) * (p1.Y - p0.Y) + 2 * t * (p2.Y - p1.Y);
 			if (float.Abs(dy) < Epsilon)
 				return;
-			
+
 			if (dy > 0)
 			{
 				if (t >= 1.0f - Epsilon)
@@ -178,7 +197,7 @@ internal sealed class BezierEdge(Vector2 p0, Vector2 p1, Vector2 p2) : Edge([p0,
 				if (t <= Epsilon)
 					return;
 			}
-			
+
 			var tInv = 1 - t;
 			var bezierPoint = tInv * tInv * p0 + 2 * tInv * t * p1 + t * t * p2;
 
@@ -231,16 +250,38 @@ internal static class Program
 {
 	private static void Main()
 	{
-		const float pxRange = 4.0f * 8;
-		const int size = 64 * 8;
+		const float pxRange = 4.0f;
+		//const float pxRange = 0.5f;
+		const int size = 64;
 
+		/*
 		//var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/segoeui.ttf");
 		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/seguiemj.ttf");
-		var glyph = font.LoadGlyph("&".EnumerateRunes().First());
-
+		//var glyph = font.LoadGlyph(Rune.GetRuneAt("👍", 0));
+		var glyph = font.LoadGlyph(Rune.GetRuneAt("😭", 0));
+		*/
+		
+		var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/segoeui.ttf");
+		var glyph = font.LoadGlyph(Rune.GetRuneAt("A", 0));
+		
+		
 		var outline = glyph.Outline ?? throw new("FIXME");
 		var contours = new List<Contour>();
 		LoadContours(outline, contours);
+
+		/*
+		Console.WriteLine($"Contours:");
+		foreach (var contour in contours)
+		{
+			Console.WriteLine($"  Contour with {contour.Edges.Count} edges");
+			foreach (var edge in contour.Edges)
+			{
+				var pointsStr = string.Join(", ", edge.Points.Select(p => $"({p.X:F1}, {p.Y:F1})"));
+				Console.WriteLine($"    Edge: {pointsStr}");
+			}
+		}
+		*/
+
 		var shape = new Shape(contours);
 
 		var glyphBounds = shape.GetBounds();
