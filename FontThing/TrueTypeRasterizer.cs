@@ -23,14 +23,14 @@ public static class TrueTypeRasterizer
 		return float.Lerp(maxDarkening, 0.0f, t);
 	}
 
-	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, float scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma)
+	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, Vector2 scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma)
 	{
 		Span<byte> gammaTable = stackalloc byte[256];
 		GenerateGammaTable(gamma, gammaTable);
 
 		var scaledBounds = glyphOutline.GetBounds(scale);
-		var bitmapWidth = (int)(scaledBounds.Width + subpixelOffsetX) + 1;
-		var bitmapHeight = (int)(scaledBounds.Height + subpixelOffsetY) + 1;
+		var bitmapWidth = (int)(scaledBounds.Width + subpixelOffsetX + 5);
+		var bitmapHeight = (int)(scaledBounds.Height + subpixelOffsetY + 5);
 
 		var supersampledWidth = bitmapWidth * supersamples;
 		var supersampledHeight = bitmapHeight * supersamples;
@@ -89,10 +89,10 @@ public static class TrueTypeRasterizer
 		}
 	}
 
-	public static void RenderGlyph(GlyphOutline glyphOutline, float scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
+	public static void RenderGlyph(GlyphOutline glyphOutline, Vector2 scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
 	{
-		var glyphXMin = glyphOutline.XMin * scale;
-		var glyphYMin = glyphOutline.YMin * scale;
+		var glyphXMin = glyphOutline.XMin * scale.X;
+		var glyphYMin = glyphOutline.YMin * scale.Y;
 		var contours = glyphOutline.GenerateContours(scale, bezierTolerance);
 		Debug.Assert(pixels.Length >= width * height);
 
@@ -184,7 +184,6 @@ public static class TrueTypeRasterizer
 			}
 		}
 	}
-
 
 	private static bool IsContourClockwise(List<Vector2> points)
 	{

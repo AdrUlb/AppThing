@@ -66,6 +66,7 @@ internal sealed class TextureManager : IDisposable
 			TextureFormat.Rgba => InternalFormat.Rgba8,
 			TextureFormat.Rgb => InternalFormat.Rgb8,
 			TextureFormat.AlphaOnly => InternalFormat.Red,
+			TextureFormat.RgbAsAlpha => InternalFormat.Rgb,
 			_ => throw new NotSupportedException($"Unsupported texture format: {texture.Format}")
 		};
 

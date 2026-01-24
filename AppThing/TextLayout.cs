@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace AppThing;
 
-public class TextLayout(string text)
+public class TextLayout(string text, BitmapFont font)
 {
 	internal readonly struct BitmapChar(Point dest, BitmapFont.GlyphTexture glyphTexture)
 	{
@@ -12,16 +12,17 @@ public class TextLayout(string text)
 	}
 
 	public readonly string Text = text;
+	public readonly BitmapFont Font = font;
 
 	private List<BitmapChar>? _chars;
 
-	internal ReadOnlySpan<BitmapChar> GetChars(BitmapFont font, Size size = default)
+	internal ReadOnlySpan<BitmapChar> GetChars(Size size = default)
 	{
 		if (_chars != null)
 			return CollectionsMarshal.AsSpan(_chars);
 
 		var chars = new List<BitmapChar>(Text.Length);
-		ComputeLayout(Text, font, chars, size);
+		ComputeLayout(Text, Font, chars, size);
 		_chars = chars;
 		return CollectionsMarshal.AsSpan(chars);
 	}
@@ -30,7 +31,7 @@ public class TextLayout(string text)
 	{
 		var penX = 0L;
 		var penY = 0L;
-		
+
 		foreach (var c in text.EnumerateRunes())
 		{
 			if (!font.TryGetGlyph(c, ref penX, ref penY, out var fontGlyph, out var drawPos))

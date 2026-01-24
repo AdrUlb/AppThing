@@ -12,7 +12,8 @@ public enum GlyphOutlineRenderOptions
 	None = 0,
 	StemDarkening = 1 << 0,
 	Gamma = 1 << 1,
-	Default = None,
+	SubpixelRgb = 1 << 2,
+	Default = Gamma | StemDarkening,
 }
 
 public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax)
@@ -30,15 +31,26 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 		float.Ceiling((YMax - YMin) * scale)
 	);
 
-	public abstract IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance);
+	public RectangleF GetBounds(Vector2 scale) => new(
+		XMin * scale.X,
+		YMin * scale.Y,
+		float.Ceiling((XMax - XMin) * scale.X),
+		float.Ceiling((YMax - YMin) * scale.Y)
+	);
 
-	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 4, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
+	public abstract IReadOnlyList<List<Vector2>> GenerateContours(Vector2 scale, float bezierTolerance);
+
+	public IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance) => GenerateContours(new Vector2(scale), bezierTolerance);
+
+	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 8, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
 	{
-		var scale = Font.PointSizeToScale(pointSize);
+		var scale = new Vector2(Font.PointSizeToScale(pointSize));
 		var stemDarkening = (options & GlyphOutlineRenderOptions.StemDarkening) != 0 ? TrueTypeRasterizer.CalculateStemDarkening(Font.GetPixelsPerEm(pointSize)) : 0;
+		var gamma = (options & GlyphOutlineRenderOptions.Gamma) != 0 ? 1.6f : 1.0f;
 
-		var gamma = (options & GlyphOutlineRenderOptions.Gamma) != 0 ? 1.2f : 1.0f;
-
+		if ((options & GlyphOutlineRenderOptions.SubpixelRgb) != 0)
+			scale.X *= 3;
+		
 		return TrueTypeRasterizer.RenderGlyph(
 			this,
 			scale,
@@ -58,7 +70,7 @@ public sealed class SimpleGlyphOutline(TrueTypeFont font, short xMin, short yMin
 	public readonly GlyphOutlinePoint[] Points = points;
 	public int NumberOfContours => EndPointsOfContours.Length;
 
-	public override IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance)
+	public override IReadOnlyList<List<Vector2>> GenerateContours(Vector2 scale, float bezierTolerance)
 	{
 		var contours = new List<Vector2>[NumberOfContours];
 
@@ -165,7 +177,7 @@ public sealed class CompoundGlyphOutline(TrueTypeFont font, short xMin, short yM
 	public readonly CompoundGlyphComponent[] Components = components;
 	public readonly byte[]? Instructions = instructions;
 
-	public override IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance)
+	public override IReadOnlyList<List<Vector2>> GenerateContours(Vector2 scale, float bezierTolerance)
 	{
 		var contours = new List<List<Vector2>>();
 
@@ -189,8 +201,8 @@ public sealed class CompoundGlyphOutline(TrueTypeFont font, short xMin, short yM
 					var scaledY = p.X * (float)component.Scale10 + p.Y * (float)component.ScaleY;
 
 					// Apply translation
-					scaledX += component.Arg1 * scale;
-					scaledY += component.Arg2 * scale;
+					scaledX += component.Arg1 * scale.X;
+					scaledY += component.Arg2 * scale.Y;
 
 					p = new(scaledX, scaledY);
 				}

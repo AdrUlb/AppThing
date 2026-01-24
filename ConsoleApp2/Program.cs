@@ -237,9 +237,9 @@ internal static class Program
 {
 	private static void Main()
 	{
-		const double pxRange = 4.0;
-		//const double pxRange = 0.5;
-		const int size = 64;
+		//const double pxRange = 4.0;
+		const double pxRange = 0.5;
+		const int size = 64 * 16;
 
 		/*
 		//var font = TrueTypeFont.FromFile("/usr/share/fonts/TTF/segoeui.ttf");
@@ -296,7 +296,11 @@ internal static class Program
 
 				sdf[x + y * width] = pixelValue;
 			}
+
+			Console.CursorLeft = 0;
+			Console.Write($"{y+1}/{height}");
 		}
+		Console.WriteLine();
 	}
 
 	private static void SaveSdfAsPng(string path, int width, int height, ReadOnlySpan<byte> sdf)
@@ -347,7 +351,9 @@ internal static class Program
 
 			void Bezier(Point p0, Point p1, Point p2)
 			{
-				edges.Add(new BezierEdge(p0.ToVector2d(), p1.ToVector2d(), p2.ToVector2d()));
+				var points = BezierSubdivider.RecursiveBezier(p0.ToVector2(), p1.ToVector2(), p2.ToVector2(), 0.1f);
+				for (var j = 0; j < points.Count - 1; j++)
+					edges.Add(new LineEdge(points[j].ToVector2d(), points[j + 1].ToVector2d()));
 			}
 		}
 	}

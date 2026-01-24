@@ -5,5 +5,10 @@ namespace UtilThing;
 
 public static class Vector2Extensions
 {
-	public static SizeF ToSizeF(this Vector2 vec) => new(vec.X, vec.Y);
+	extension(Vector2 vec)
+	{
+		public SizeF ToSizeF() => new(vec.X, vec.Y);
+
+		public Vector2d ToVector2d() => new(vec.X, vec.Y);
+	}
 }

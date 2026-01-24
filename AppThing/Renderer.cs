@@ -173,9 +173,9 @@ public sealed class Renderer : IDisposable
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void DrawText(TextLayout textLayout, Point location, BitmapFont font, Color color)
+	public void DrawText(TextLayout textLayout, Point location, Color color)
 	{
-		var span = textLayout.GetChars(font);
+		var span = textLayout.GetChars();
 		DrawText(span, location, color);
 	}
 

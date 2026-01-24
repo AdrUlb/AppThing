@@ -21,6 +21,7 @@ public enum TextureFormat : byte
 	Rgba,
 	Rgb,
 	AlphaOnly,
+	RgbAsAlpha
 }
 
 public sealed class Texture : IDisposable

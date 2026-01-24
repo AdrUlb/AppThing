@@ -57,17 +57,28 @@ internal sealed class QuadRenderer : BatchRenderer, IDisposable
 	private const string _fragmentShaderSource =
 		"""
 		#version 330 core
-		out vec4 FragColor;
+		layout (location = 0) out vec4 oColor;
+		layout (location = 1) out vec4 oAlpha;
 
 		in vec4 vColor;
 		in vec2 vTexCoord;
 
 		uniform sampler2D uTexture;
+		uniform uint uFlags;
 
 		void main()
 		{
 			vec4 texColor = texture(uTexture, vTexCoord);
-			FragColor = vColor * texColor;
+		
+			if ((uFlags & 1u) != 0u)
+			{
+				oColor = vec4(vColor.rgb, 1.0);
+				oAlpha = vec4(texColor.rgb, 1.0);
+			}
+			else
+			{
+				oColor = vColor * texColor;
+			}
 		}
 		""";
 
@@ -81,6 +92,7 @@ internal sealed class QuadRenderer : BatchRenderer, IDisposable
 	private readonly GLVertexArray _vao = new();
 
 	private readonly GLUniformLocation _uProjection;
+	private readonly GLUniformLocation _uFlags;
 
 	private readonly List<InstanceAttribs> _instanceAttribs = new(_maxQuadsPerBatch);
 
@@ -125,6 +137,7 @@ internal sealed class QuadRenderer : BatchRenderer, IDisposable
 			throw new($"Shader program linking failed: {_program.GetInfoLog()}");
 
 		_uProjection = _program.GetUniformLocation("uProjection");
+		_uFlags = _program.GetUniformLocation("uFlags");
 	}
 
 	public void Dispose()
@@ -161,6 +174,17 @@ internal sealed class QuadRenderer : BatchRenderer, IDisposable
 	{
 		if (_instanceAttribs.Count != 0)
 		{
+			var flags = 0u;
+			if (_renderer.TextureManager.CurrentTexture?.Format == TextureFormat.RgbAsAlpha)
+			{
+				flags |= 1 << 0;
+				ManagedGL.Current.Unmanaged.BlendFunc(BlendingFactor.Src1Color, BlendingFactor.OneMinusSrc1Color);
+			}
+			else
+				ManagedGL.Current.Unmanaged.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+
+			_uFlags.UInt(flags);
 			// Upload instance data to the GPU and draw
 			_instanceBuffer.SubData(0, CollectionsMarshal.AsSpan(_instanceAttribs)[..QuadCount]);
 			_vao.DrawArraysInstanced(PrimitiveType.TriangleStrip, 0, 4, QuadCount, _program);
