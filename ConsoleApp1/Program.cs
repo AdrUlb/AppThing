@@ -12,7 +12,7 @@ internal static class Program
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
 		const string fontFile = @"/usr/share/fonts/TTF/times.ttf";
-		var fontSize = 40.0f;
+		var fontSize = 100.0f;
 
 		var font = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.Default);
 		var fontSubpixel = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.SubpixelAntialias);
@@ -20,12 +20,12 @@ internal static class Program
 		//var font = VectorFont.FromFile(fontFile);
 
 		var textColor = Color.FromArgb(147, 161, 161);
+		//var textColor = Color.White;
 
 		window.Visible = true;
 
 		var frameCount = 0;
 		var accumulator = 0.0;
-		var fpsString = "FPS: N/A";
 
 		var text = $"\n\nFPS: Hello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
 
@@ -34,6 +34,7 @@ internal static class Program
 
 		var textLayout = new TextLayout(text, font);
 		var textLayoutSubpixel = new TextLayout(text, fontSubpixel);
+		var fpsString = "0";
 
 		// Calculations for FPS stuff
 		window.Draw += (renderer, delta) =>
@@ -41,9 +42,10 @@ internal static class Program
 			accumulator += delta;
 			frameCount++;
 
+			var fpsText = $"FPS: {fpsString}\nSubpixel antialiasing: {(subpixel ? "on" : "off")}";
 			if (accumulator >= 0.5)
 			{
-				fpsString = $"FPS: {frameCount / accumulator:F2}\nSubpixel antialiasing: {(subpixel ? "on" : "off")}";
+				fpsString = $"{frameCount / accumulator:F2}";
 				accumulator = 0;
 				frameCount = 0;
 			}
@@ -54,7 +56,7 @@ internal static class Program
 			ref var layout = ref subpixel ? ref textLayoutSubpixel : ref textLayout;
 			var f = subpixel ? fontSubpixel : font;
 			renderer.DrawText(layout, new(10, 0), textColor);
-			renderer.DrawText(fpsString, new(10, 0), f, Color.White);
+			renderer.DrawText(fpsText, new(10, 0), f, Color.White);
 
 			if (Console.KeyAvailable)
 			{

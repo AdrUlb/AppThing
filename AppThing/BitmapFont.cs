@@ -94,31 +94,26 @@ public sealed class BitmapFont : IDisposable
 			options &= ~GlyphOutlineRenderOptions.SubpixelRgb;
 		}
 
-		var round = _pixelSize <= 100.0f;
+		//var round = _pixelSize <= 40.0f;
+		const bool round = true;
 		if (round)
 		{
-			var roundingDivisor = 2.0f;
-			if (_pixelSize <= 50.0f)
-				roundingDivisor = 4.0f;
-			else if (_pixelSize <= 25.0f)
-				roundingDivisor = 8.0f;
-			else if (_pixelSize <= 12.5f)
-				roundingDivisor = 16.0f;
-
+			var roundingDivisor = 20.0f;
+			if (_pixelSize >= 50)
+				roundingDivisor = 2.0f;
+			
 			//if ((_flags & BitmapFontFlags.SubpixelAntialias) == 0)
-				subX = (int)((glyphXPrecise - glyphX) * roundingDivisor) / roundingDivisor;
-
+			subX = (int)((glyphXPrecise - glyphX) * roundingDivisor) / roundingDivisor;
 			subY = (int)((glyphYPrecise - glyphY) * roundingDivisor) / roundingDivisor;
 
 			//if ((_flags & BitmapFontFlags.SubpixelAntialias) == 0)
-			/*
 			{
 				if (subX <= 0.0f)
 				{
 					subX++;
 					glyphX--;
 				}
-			}*/
+			}
 
 			if (subY <= 0.0f)
 			{
@@ -132,7 +127,7 @@ public sealed class BitmapFont : IDisposable
 			var useSubX = subX;
 			if ((_flags & BitmapFontFlags.SubpixelAntialias) != 0)
 				useSubX *= 3;
-			
+
 			var bitmap = glyph.Outline.Render(Size, options, subpixelOffsetX: useSubX, subpixelOffsetY: subY);
 
 			var size = bitmap.Size;

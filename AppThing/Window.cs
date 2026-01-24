@@ -143,7 +143,7 @@ public sealed class Window : IDisposable
 		if (_disposed)
 			return;
 		
-		Console.WriteLine($"[Window] Waiting for render thread to finish before disposing...");
+		Console.WriteLine($"[Window] Waiting for render thread to finish...");
 		StopRenderThread();
 		App.UnregisterWindow(this);
 

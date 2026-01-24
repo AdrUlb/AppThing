@@ -11,7 +11,7 @@ public static class TrueTypeRasterizer
 	{
 		const float minPpem = 10.0f;
 		const float maxPpem = 36.0f;
-		const float maxDarkening = 0.25f;
+		const float maxDarkening = 0.2f;
 
 		if (pixelsPerEm <= minPpem)
 			return maxDarkening;
@@ -23,7 +23,7 @@ public static class TrueTypeRasterizer
 		return float.Lerp(maxDarkening, 0.0f, t);
 	}
 
-	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, Vector2 scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma)
+	public static GlyphBitmap RenderGlyph(GlyphOutline glyphOutline, Vector2 scale, int supersamples, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, float gamma, Vector2 snapTolerance, Vector2 snapTo)
 	{
 		Span<byte> gammaTable = stackalloc byte[256];
 		GenerateGammaTable(gamma, gammaTable);
@@ -38,9 +38,10 @@ public static class TrueTypeRasterizer
 		var supersampledPool = ArrayPool<bool>.Shared;
 		var supersampled = supersampledPool.Rent(supersampledWidth * supersampledHeight);
 
-		RenderGlyph(glyphOutline, scale * supersamples, bezierTolerance, subpixelOffsetX * supersamples, subpixelOffsetY * supersamples, stemDarkeningAmount * supersamples, supersampled, supersampledWidth, supersampledHeight);
+		RenderGlyph(glyphOutline, scale * supersamples, bezierTolerance, subpixelOffsetX * supersamples, subpixelOffsetY * supersamples, stemDarkeningAmount * supersamples, snapTolerance, snapTo, supersampled, supersampledWidth, supersampledHeight);
 
 		var bitmap = new byte[bitmapWidth * bitmapHeight];
+
 		var downsampledPixelContrib = 1.0f / (supersamples * supersamples);
 
 		for (var y = 0; y < bitmapHeight; y++)
@@ -53,18 +54,31 @@ public static class TrueTypeRasterizer
 				{
 					var yy = y * supersamples + offY;
 					var rowOffset = yy * supersampledWidth;
+					var weightRowOffset = offY * supersamples;
 
 					for (var offX = 0; offX < supersamples; offX++)
 					{
 						var xx = x * supersamples + offX;
 
 						if (supersampled[xx + rowOffset])
+						{
 							a += downsampledPixelContrib;
+						}
 					}
 				}
 
-				var alpha = (byte)(a * 255);
-				bitmap[x + y * bitmapWidth] = gammaTable[alpha];
+				var alpha = (byte)int.Clamp((int)(a * 255), 0, 255);
+
+				/*
+				if (alpha < byte.MinValue + 20)
+					alpha = 0;
+
+				if (alpha > byte.MaxValue - 20)
+					alpha = 255;
+				*/
+				alpha = gammaTable[alpha];
+
+				bitmap[x + y * bitmapWidth] = alpha;
 			}
 		}
 
@@ -89,20 +103,57 @@ public static class TrueTypeRasterizer
 		}
 	}
 
-	public static void RenderGlyph(GlyphOutline glyphOutline, Vector2 scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Span<bool> pixels, int width, int height)
+	public static void RenderGlyph(GlyphOutline glyphOutline, Vector2 scale, float bezierTolerance, float subpixelOffsetX, float subpixelOffsetY, float stemDarkeningAmount, Vector2 snapTolerance, Vector2 snapTo, Span<bool> pixels, int width, int height)
 	{
 		var glyphXMin = glyphOutline.XMin * scale.X;
 		var glyphYMin = glyphOutline.YMin * scale.Y;
+
 		var contours = glyphOutline.GenerateContours(scale, bezierTolerance);
 		Debug.Assert(pixels.Length >= width * height);
-
-		var renderOffset = new Vector2(-glyphXMin, -glyphYMin);
 
 		Span<bool> contoursClockwise = stackalloc bool[contours.Count];
 		for (var i = 0; i < contours.Count; i++)
 			contoursClockwise[i] = IsContourClockwise(contours[i]);
 
 		var changes = new List<(float X, bool Clockwise, bool GoingDown)>();
+
+		var renderOffset = new Vector2(-glyphXMin, -glyphYMin);
+
+		foreach (var contour in contours)
+		{
+			for (var i = 0; i < contour.Count; i++)
+				contour[i] += renderOffset;
+
+			if (snapTolerance is { X: <= 0.0f, Y: <= 0.0f })
+				continue;
+
+			for (var i = 0; i < contour.Count; i++)
+			{
+				var nextI = (i + 1) % contour.Count;
+
+				var p1 = contour[i];
+				var p2 = contour[nextI];
+
+				if (float.Abs(p1.X - p2.X) < snapTolerance.X)
+				{
+					var average = (p1.X + p2.X) / 2;
+					var snapped = float.Round(average / snapTo.X) * snapTo.X;
+					p1.X = snapped;
+					p2.X = snapped;
+				}
+
+				if (float.Abs(p1.Y - p2.Y) < snapTolerance.Y)
+				{
+					var average = (p1.Y + p2.Y) / 2;
+					var snapped = float.Round(average / snapTo.Y) * snapTo.Y;
+					p1.Y = snapped;
+					p2.Y = snapped;
+				}
+
+				contour[i] = p1;
+				contour[nextI] = p2;
+			}
+		}
 
 		for (var y = 0; y < height; y++)
 		{
@@ -116,8 +167,8 @@ public static class TrueTypeRasterizer
 				var clockwise = contoursClockwise[contourIndex];
 				for (var pointIndex = 0; pointIndex < contour.Count; pointIndex++)
 				{
-					var p1 = contour[pointIndex] + renderOffset;
-					var p2 = contour[(pointIndex + 1) % contour.Count] + renderOffset;
+					var p1 = contour[pointIndex];
+					var p2 = contour[(pointIndex + 1) % contour.Count];
 
 					// Both points entirely above or below this scanline
 					if ((p1.Y < sampleY && p2.Y < sampleY) || p1.Y >= sampleY && p2.Y >= sampleY)

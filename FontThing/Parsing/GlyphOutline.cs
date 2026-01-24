@@ -13,7 +13,7 @@ public enum GlyphOutlineRenderOptions
 	StemDarkening = 1 << 0,
 	Gamma = 1 << 1,
 	SubpixelRgb = 1 << 2,
-	Default = Gamma | StemDarkening,
+	Default = StemDarkening,
 }
 
 public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, short xMax, short yMax)
@@ -42,14 +42,20 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 
 	public IReadOnlyList<List<Vector2>> GenerateContours(float scale, float bezierTolerance) => GenerateContours(new Vector2(scale), bezierTolerance);
 
-	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 8, float bezierTolerance = 0.01f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
+	public GlyphBitmap Render(float pointSize, GlyphOutlineRenderOptions options = GlyphOutlineRenderOptions.Default, int supersamples = 6, float bezierTolerance = 0.02f, float subpixelOffsetX = 0.0f, float subpixelOffsetY = 0.0f)
 	{
 		var scale = new Vector2(Font.PointSizeToScale(pointSize));
+		var pixelSize = Font.GetPixelsPerEm(pointSize);
 		var stemDarkening = (options & GlyphOutlineRenderOptions.StemDarkening) != 0 ? TrueTypeRasterizer.CalculateStemDarkening(Font.GetPixelsPerEm(pointSize)) : 0;
-		var gamma = (options & GlyphOutlineRenderOptions.Gamma) != 0 ? 1.6f : 1.0f;
+		var gamma = (options & GlyphOutlineRenderOptions.Gamma) != 0 ? 0.8f : 1.0f;
 
-		if ((options & GlyphOutlineRenderOptions.SubpixelRgb) != 0)
+		var subpixelRgb = (options & GlyphOutlineRenderOptions.SubpixelRgb) != 0;
+		if (subpixelRgb)
 			scale.X *= 3;
+
+		var gridSnap = pixelSize is >= 20 and <= 50;
+		var snapTolerance = gridSnap ? new Vector2((subpixelRgb ? 3.0f : 1.0f) * 0.1f, 0.1f) : Vector2.Zero;
+		var snapTo = supersamples * new Vector2((subpixelRgb ? 3.0f : 1.0f) * 0.5f, 0.5f);
 		
 		return TrueTypeRasterizer.RenderGlyph(
 			this,
@@ -59,7 +65,9 @@ public abstract class GlyphOutline(TrueTypeFont font, short xMin, short yMin, sh
 			subpixelOffsetX,
 			subpixelOffsetY,
 			stemDarkening,
-			gamma);
+			gamma,
+			snapTolerance,
+			snapTo);
 	}
 }
 
