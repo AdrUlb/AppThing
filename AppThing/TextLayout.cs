@@ -15,36 +15,33 @@ public class TextLayout(string text, BitmapFont font)
 	public readonly BitmapFont Font = font;
 
 	private List<BitmapChar>? _chars;
+	private Size _size = Size.Empty;
 
-	internal ReadOnlySpan<BitmapChar> GetChars(Size size = default)
+	internal ReadOnlySpan<BitmapChar> GetChars(Size size)
 	{
-		if (_chars != null)
+		if (_chars != null && size.Width < _size.Width && size.Height < _size.Height)
 			return CollectionsMarshal.AsSpan(_chars);
 
 		var chars = new List<BitmapChar>(Text.Length);
+		_size = size;
 		ComputeLayout(Text, Font, chars, size);
 		_chars = chars;
 		return CollectionsMarshal.AsSpan(chars);
 	}
 
-	internal static void ComputeLayout(string text, BitmapFont font, List<BitmapChar> chars, Size size = default)
+	internal static void ComputeLayout(string text, BitmapFont font, List<BitmapChar> chars, Size size)
 	{
-		var penX = 0L;
-		var penY = 0L;
-
+		var measurer = new TextPen();
 		foreach (var c in text.EnumerateRunes())
 		{
-			if (!font.TryGetGlyph(c, ref penX, ref penY, out var fontGlyph, out var drawPos))
+			if (!font.TryGetGlyph(c, ref measurer, out var fontGlyph, out var drawPos))
 				continue;
 
-			if (size != default)
-			{
-				if (drawPos.Y >= size.Height)
-					break;
+			if (drawPos.Y >= size.Height)
+				break;
 
-				if (drawPos.X >= size.Width)
-					continue;
-			}
+			if (drawPos.X >= size.Width)
+				continue;
 
 			chars.Add(new(drawPos, fontGlyph));
 		}

@@ -8,7 +8,7 @@ namespace AppThing;
 [Flags]
 public enum BitmapFontFlags
 {
-	SubpixelAntialias = 1 << 0,
+	SubpixelRgb = 1 << 0,
 	Default = 0
 }
 
@@ -46,26 +46,18 @@ public sealed class BitmapFont : IDisposable
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public bool TryGetGlyph(Rune character, ref long penX, ref long penY, out GlyphTexture glyphTexture, out Point drawPos)
+	internal bool TryGetGlyph(Rune character, ref TextPen pen, out GlyphTexture glyphTexture, out Point drawPos)
 	{
-		if (character.Value == '\n')
-		{
-			penX = 0;
-			penY -= _ttf.LineHeight;
+		var glyph = GetOrLoadGlyph(character);
 
+		if (!pen.PrepareGlyph(glyph))
+		{
 			glyphTexture = default;
 			drawPos = Point.Empty;
 			return false;
 		}
 
-		if (!_loadedGlyphs.TryGetValue(character, out var glyph))
-		{
-			glyph = _ttf.LoadGlyph(character);
-			_loadedGlyphs.Add(character, glyph);
-		}
-
-		if (penX == 0.0f)
-			penX -= glyph.LeftSideBearing;
+		pen.DoGlyph(glyph, out var penX, out var penY);
 
 		if (glyph.Outline == null)
 		{
@@ -85,7 +77,7 @@ public sealed class BitmapFont : IDisposable
 
 		var options = GlyphOutlineRenderOptions.Default;
 
-		if ((_flags & BitmapFontFlags.SubpixelAntialias) != 0)
+		if ((_flags & BitmapFontFlags.SubpixelRgb) != 0)
 		{
 			options |= GlyphOutlineRenderOptions.SubpixelRgb;
 		}
@@ -98,10 +90,10 @@ public sealed class BitmapFont : IDisposable
 		const bool round = true;
 		if (round)
 		{
-			var roundingDivisor = 20.0f;
+			var roundingDivisor = 10.0f;
 			if (_pixelSize >= 50)
 				roundingDivisor = 2.0f;
-			
+
 			//if ((_flags & BitmapFontFlags.SubpixelAntialias) == 0)
 			subX = (int)((glyphXPrecise - glyphX) * roundingDivisor) / roundingDivisor;
 			subY = (int)((glyphYPrecise - glyphY) * roundingDivisor) / roundingDivisor;
@@ -125,14 +117,14 @@ public sealed class BitmapFont : IDisposable
 		if (!_glyphs.TryGetValue((glyph, subX, subY), out glyphTexture))
 		{
 			var useSubX = subX;
-			if ((_flags & BitmapFontFlags.SubpixelAntialias) != 0)
+			if ((_flags & BitmapFontFlags.SubpixelRgb) != 0)
 				useSubX *= 3;
 
 			var bitmap = glyph.Outline.Render(Size, options, subpixelOffsetX: useSubX, subpixelOffsetY: subY);
 
 			var size = bitmap.Size;
 
-			if ((_flags & BitmapFontFlags.SubpixelAntialias) != 0)
+			if ((_flags & BitmapFontFlags.SubpixelRgb) != 0)
 				size.Width /= 3;
 
 			var texture = TryAllocateRegion(size, out var region);
@@ -147,7 +139,7 @@ public sealed class BitmapFont : IDisposable
 						for (var x = 0; x < size.Width; x++)
 						{
 							var pixelOffset = (bitmap.Size.Height - y - 1) * bitmap.Size.Width;
-							if ((_flags & BitmapFontFlags.SubpixelAntialias) != 0)
+							if ((_flags & BitmapFontFlags.SubpixelRgb) != 0)
 							{
 								var offR = x * 3 + 0;
 								var offG = x * 3 + 1;
@@ -190,8 +182,44 @@ public sealed class BitmapFont : IDisposable
 		drawPos = new(glyphX, -glyphY - glyphTexture.AtlasRegion.Size.Height);
 
 		end:
-		penX += glyph.AdvanceWidth;
 		return glyph.Outline != null;
+	}
+
+	public Rectangle MeasureText(string text)
+	{
+		var pen = new TextPen();
+
+		var leftBearing = 0;
+
+		foreach (var character in text.EnumerateRunes())
+		{
+			var glyph = GetOrLoadGlyph(character);
+
+			if (!pen.PrepareGlyph(glyph))
+				continue;
+
+			pen.DoGlyph(glyph, out _, out _);
+		}
+
+		//var x = (int)(pen.Left * _scale);
+		//var w = (int)float.Ceiling((pen.Width) * _scale);
+		
+		var x = 0;
+		var w = (int)float.Ceiling(pen.X * _scale);
+		
+		var y = (int)float.Ceiling(-_ttf.Descent * _scale);
+		var h = (int)float.Ceiling((pen.Y - _ttf.LineHeight) * -_scale);
+		return new(x, y, w + 1, h);
+	}
+
+	private Glyph GetOrLoadGlyph(Rune character)
+	{
+		if (_loadedGlyphs.TryGetValue(character, out var glyph))
+			return glyph;
+
+		glyph = _ttf.LoadGlyph(character);
+		_loadedGlyphs.Add(character, glyph);
+		return glyph;
 	}
 
 	private Texture TryAllocateRegion(Size size, out Rectangle rect)
@@ -213,7 +241,7 @@ public sealed class BitmapFont : IDisposable
 		Console.WriteLine($"[BitmapFont] Creating new texture atlas ({atlasSize}x{atlasSize})");
 
 		var textureFormat = TextureFormat.AlphaOnly;
-		if ((_flags & BitmapFontFlags.SubpixelAntialias) != 0)
+		if ((_flags & BitmapFontFlags.SubpixelRgb) != 0)
 			textureFormat = TextureFormat.RgbAsAlpha;
 
 		var newAtlasTexture = new Texture(new(atlasSize, atlasSize), Color.Black, textureFormat);

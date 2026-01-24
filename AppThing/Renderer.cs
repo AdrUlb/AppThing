@@ -157,10 +157,13 @@ public sealed class Renderer : IDisposable
 	public void Draw(Texture texture, Rectangle destRect, Rectangle sourceRect) => Draw(texture, destRect, sourceRect, Color.White);
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Draw(Texture texture, Rectangle destRect) => Draw(texture, destRect, new(Point.Empty, texture.Size));
+	public void Draw(Texture texture, Rectangle destRect) => Draw(texture, destRect, new Rectangle(Point.Empty, texture.Size));
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Draw(Texture texture, Point location) => Draw(texture, new Rectangle(location, texture.Size));
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Draw(Texture texture, Rectangle destRect, Color color) => Draw(texture, destRect, new Rectangle(Point.Empty, texture.Size), color, Matrix4x4.Identity);
 
 	private readonly List<TextLayout.BitmapChar> _charBuffer = [];
 
@@ -168,14 +171,14 @@ public sealed class Renderer : IDisposable
 	public void DrawText(string text, Point location, BitmapFont font, Color color)
 	{
 		_charBuffer.Clear();
-		TextLayout.ComputeLayout(text, font, _charBuffer);
+		TextLayout.ComputeLayout(text, font, _charBuffer, _size);
 		DrawText(CollectionsMarshal.AsSpan(_charBuffer), location, color);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void DrawText(TextLayout textLayout, Point location, Color color)
 	{
-		var span = textLayout.GetChars();
+		var span = textLayout.GetChars(_size);
 		DrawText(span, location, color);
 	}
 

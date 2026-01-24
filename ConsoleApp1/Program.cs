@@ -11,11 +11,11 @@ internal static class Program
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		const string fontFile = @"/usr/share/fonts/TTF/times.ttf";
-		var fontSize = 100.0f;
+		const string fontFile = @"/usr/share/fonts/TTF/calibri.ttf";
+		var fontSize = 11.0f;
 
 		var font = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.Default);
-		var fontSubpixel = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.SubpixelAntialias);
+		var fontSubpixel = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.SubpixelRgb);
 		var subpixel = true;
 		//var font = VectorFont.FromFile(fontFile);
 
@@ -27,7 +27,7 @@ internal static class Program
 		var frameCount = 0;
 		var accumulator = 0.0;
 
-		var text = $"\n\nFPS: Hello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
+		var text = $"\n\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
 
 		for (var i = 0; i < 1000; i++)
 			text += "\nLorem ipsum dolor sit amet, consectetur adipiscing elit.";
@@ -35,6 +35,8 @@ internal static class Program
 		var textLayout = new TextLayout(text, font);
 		var textLayoutSubpixel = new TextLayout(text, fontSubpixel);
 		var fpsString = "0";
+
+		var solid = new Texture(new(1, 1), Color.White);
 
 		// Calculations for FPS stuff
 		window.Draw += (renderer, delta) =>
@@ -55,8 +57,12 @@ internal static class Program
 
 			ref var layout = ref subpixel ? ref textLayoutSubpixel : ref textLayout;
 			var f = subpixel ? fontSubpixel : font;
+
 			renderer.DrawText(layout, new(10, 0), textColor);
-			renderer.DrawText(fpsText, new(10, 0), f, Color.White);
+
+			var fpsRect = f.MeasureText(fpsText);
+			renderer.Draw(solid, fpsRect, Color.FromArgb(20, 20, 20));
+			renderer.DrawText(fpsText, new(0, 0), f, Color.White);
 
 			if (Console.KeyAvailable)
 			{
