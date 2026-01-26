@@ -11,8 +11,8 @@ internal static class Program
 
 		window.Renderer.ClearColor = Color.FromArgb(0, 43, 54);
 
-		const string fontFile = @"/usr/share/fonts/TTF/calibri.ttf";
-		var fontSize = 11.0f;
+		const string fontFile = @"/usr/share/fonts/TTF/segoeui.ttf";
+		var fontSize = 8.0f;
 
 		var font = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.Default);
 		var fontSubpixel = BitmapFont.FromFile(fontFile, fontSize, BitmapFontFlags.SubpixelRgb);
@@ -27,10 +27,7 @@ internal static class Program
 		var frameCount = 0;
 		var accumulator = 0.0;
 
-		var text = $"\n\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.";
-
-		for (var i = 0; i < 1000; i++)
-			text += "\nLorem ipsum dolor sit amet, consectetur adipiscing elit.";
+		var text = $"\n\nHello, World!\nTesting 123...\nThe quick brown fox jumps over the lazy dog.\nFranz jagt im komplett verwahrlosten Taxi quer durch Bayern.\nLorem ipsum dolor sit amet, consectetur adipiscing elit.";
 
 		var textLayout = new TextLayout(text, font);
 		var textLayoutSubpixel = new TextLayout(text, fontSubpixel);
@@ -60,9 +57,11 @@ internal static class Program
 
 			renderer.DrawText(layout, new(10, 0), textColor);
 
+			var fpsPos = new Point(10, 0);
 			var fpsRect = f.MeasureText(fpsText);
+			fpsRect.Offset(fpsPos);
 			renderer.Draw(solid, fpsRect, Color.FromArgb(20, 20, 20));
-			renderer.DrawText(fpsText, new(0, 0), f, Color.White);
+			renderer.DrawText(fpsText, fpsPos, f, Color.Orange);
 
 			if (Console.KeyAvailable)
 			{

@@ -94,17 +94,13 @@ public sealed class BitmapFont : IDisposable
 			if (_pixelSize >= 50)
 				roundingDivisor = 2.0f;
 
-			//if ((_flags & BitmapFontFlags.SubpixelAntialias) == 0)
 			subX = (int)((glyphXPrecise - glyphX) * roundingDivisor) / roundingDivisor;
 			subY = (int)((glyphYPrecise - glyphY) * roundingDivisor) / roundingDivisor;
 
-			//if ((_flags & BitmapFontFlags.SubpixelAntialias) == 0)
+			if (subX <= 0.0f)
 			{
-				if (subX <= 0.0f)
-				{
-					subX++;
-					glyphX--;
-				}
+				subX++;
+				glyphX--;
 			}
 
 			if (subY <= 0.0f)
@@ -203,10 +199,10 @@ public sealed class BitmapFont : IDisposable
 
 		//var x = (int)(pen.Left * _scale);
 		//var w = (int)float.Ceiling((pen.Width) * _scale);
-		
+
 		var x = 0;
 		var w = (int)float.Ceiling(pen.X * _scale);
-		
+
 		var y = (int)float.Ceiling(-_ttf.Descent * _scale);
 		var h = (int)float.Ceiling((pen.Y - _ttf.LineHeight) * -_scale);
 		return new(x, y, w + 1, h);
